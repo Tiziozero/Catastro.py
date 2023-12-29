@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import socket, threading, json, sys, datetime, random, string
+import socket, threading, json, sys, datetime, random, string, uuid
 import sqlite3 as sql
 from comunication_enums import *
 
@@ -43,6 +43,34 @@ class Server:
         except Exception as e:
             print(f"ERROR in server initialisation -> {e}")
 
+    def register_user(self, c):
+        print("registering user")
+        while True:
+            c.send(b'enter username: ')
+            user_name = c.recv(1024).encode()
+            t, e = user_name_pass(user_name)
+            if not t:
+                c.send(Aproval_Message.APROV_DISAPROVED)
+                c.send(f"Invalid username -> {e}")
+                break
+            else:
+                c.send(Aproval_Message.APROV_APROVED)
+                break
+        while True:
+            c.send(b'enter password: ')
+            password = c.recv(1024).encode()
+            t, e = user_pw_pass(user_name)
+            if not t:
+                c.send(Aproval_Message.APROV_DISAPROVED)
+                c.send(f"Invalid username -> {e}")
+                break
+            else:
+                c.send(Aproval_Message.APROV_APROVED)
+                break
+
+
+        
+    
     def user_authentication(self, data) -> bytes:
         print(data)
         return Auth_Enums.AUTH_OK
@@ -55,6 +83,10 @@ class Server:
             try:
                 a, p = self.s.accept()
                 print(f"Accepted connection from {a}, at port{p}")
+                #try:
+                #    self.register_user(a)
+                # except:
+                #     pass
                 data = json.loads(a.recv(1024).decode())
                 print(data)
                 auth = self.user_authentication(data)

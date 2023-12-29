@@ -23,6 +23,29 @@ class Client:
             self.user_id = data["user_id"]
             self.password = data["user_password"]
 
+
+
+    def register_client(self):
+        while True:
+            n = self.s.recv(512).decode()
+            point(m)
+            self.s.send(input("Enter Username: "))
+            if self.s.recv(512) == Aproval_Message.APROV_DISAPROVED:
+                print(self.s.recv(1024))
+            elif self.s.recv(512) == Aproval_Message.APROV_APROVED:
+                break
+        while True:
+            p = self.s.recv(512).decode()
+            print(p)
+            self.s.send(input("Enter Username: "))
+            if self.s.recv(512) == Aproval_Message.APROV_DISAPROVED:
+                print(self.s.recv(1024))
+            elif self.s.recv(512) == Aproval_Message.APROV_APROVED:
+                break
+
+
+
+
     def client_authentication(self):
         try:
             authentication_data = {"user_name": self.user_name, "user_id": self.user_id, "passeord": self.password}
@@ -43,6 +66,7 @@ class Client:
             return False
             
     def run(self):
+        self.register_client()
         if self.client_authentication():
             print("Running")
         else:
