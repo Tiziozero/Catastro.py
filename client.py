@@ -25,25 +25,21 @@ class Client:
 
     def client_authentication(self):
         try:
-            try:
-                authentication_data = {"user_name": self.user_name, "user_id": self.user_id, "passeord": self.password}
-                self.s.send(json.dumps(authentication_data).encode())
-                verdict = self.s.recv(1024).decode()
-                print("Received authentication verdict")
-                if verdict != Auth_Enums.AUTH_OK:
-                    print("ERROR -> Authentication failed:")
-                    match (verdict):
-                        case Auth_Enums.AUTH_WRONG_PASSWORD: print("Wrong Password")
-                        case Auth_Enums.AUTH_NO_SUCH_USER: print("No such user")
-                    return False
-                else:
-                    print("authentication successfull")
-                    return True
-            except Exception as e:
-                print(f"ERROR in client init user config: sending data -> {e}")
+            authentication_data = {"user_name": self.user_name, "user_id": self.user_id, "passeord": self.password}
+            self.s.send(json.dumps(authentication_data).encode())
+            verdict = self.s.recv(1024)
+            print(f"Received authentication verdict {verdict}")
+            if verdict != Auth_Enums.AUTH_OK:
+                print("ERROR -> Authentication failed:")
+                match (verdict):
+                    case Auth_Enums.AUTH_WRONG_PASSWORD: print("Wrong Password")
+                    case Auth_Enums.AUTH_NO_SUCH_USER: print("No such user")
                 return False
+            else:
+                print("authentication successfull")
+                return True
         except Exception as e:
-            print(f"ERROR in client init user config loader -> {e}")
+            print(f"ERROR in client authentication -> {e}")
             return False
             
     def run(self):

@@ -44,7 +44,8 @@ class Server:
             print(f"ERROR in server initialisation -> {e}")
 
     def user_authentication(self, data) -> bytes:
-        return Auth_Enums.AUTH_NO_SUCH_USER
+        print(data)
+        return Auth_Enums.AUTH_OK
 
     def client_lobby(self, c):
         pass
@@ -58,16 +59,26 @@ class Server:
                 print(data)
                 auth = self.user_authentication(data)
                 if auth == Auth_Enums.AUTH_OK:
+                    print(f"Authemtocatopn successfull")
+                    print(f"sending authentication: {auth}")
+                    a.send(auth)
                     c = User(a, p, data)
                     th = threading.Thread(target=self.client_lobby, args=(c,))
                     th.daemon = True
                     th.start()
                 else:
-                    # print("sending authentication")
+                    print("sending authentication")
                     print(f"sending authentication: {auth}")
                     a.send(auth)
+                    print(f"sent data: {auth}")
+            except KeyboardInterrupt:
+                print("Server closed forcefully")
+                break
             except Exception as e:
                 print(f"ERROR in server client acceptance -> {e}")
+
+        print("Ending main loop")
+        input()
 
 class User:
     def __init__(self, a, p, data):
