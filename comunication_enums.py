@@ -1,9 +1,17 @@
+class Action:
+    ACT_LOG_IN = b'LOG_IN'
+    ACT_REGISTER_USER = b'REGISTER_USER'
+    ACT_CREATE_ROOM = b'CREATE_ROOM'
+    ACT_JOIN_ROOM = b'JOIN_ROOM'
+
+
 class Aproval_Messages:
     APROV_APROVED = b'OK'
     APROV_DISAPROVED = b'NO'
 
 class Auth_Enums:
-    AUTH_OK = b'ok'
+    AUTH_NO_LOGIN_DETAILS = b'NO_LOGIN_DETAILS'
+    AUTH_OK = b'OK'
     AUTH_NO_SUCH_USER = b'NO_SUCH_USER'
     AUTH_WRONG_PASSWORD = b'WRONG_PASSWORD'
     AUTH_WRONG_USER_ID = b'WRONG_USER_ID'

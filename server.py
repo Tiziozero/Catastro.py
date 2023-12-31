@@ -3,16 +3,17 @@
 import socket, threading, json, sys, datetime, random, string, uuid
 import sqlite3 as sql
 from comunication_enums import *
+from user import User
 
+MAX_CONNECTIONS = 16
 def random_16_letter_string_generator():
     return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
 
-print(random_16_letter_string_generator())
+
 class Server:
     def __init__(self, addr, port):
         self.addr, self.port = addr, port
         self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
         try:
             self.room_db = sql.connect('databases/rooms/rooms.db')
             self.room_c = self.room_db.cursor()
@@ -35,91 +36,73 @@ class Server:
                    active INTEGER,
                    deacription TEXT)''')
             self.user_db.commit()
+            self.room_db.close()
+            self.user_db.close()
+
         except Exception as e:
             print(f"ERROR in server database initialisation -> {e}")
         try:
             self.s.bind((self.addr, self.port))
             self.s.listen()
         except Exception as e:
-            print(f"ERROR in server initialisation -> {e}")
-
-    def register_user(self, c):
-        print("registering user")
-        while True:
-            c.send(b'enter username: ')
-            user_name = c.recv(1024).encode()
-            t, e = user_name_pass(user_name)
-            if not t:
-                c.send(Aproval_Message.APROV_DISAPROVED)
-                c.send(f"Invalid username -> {e}")
-                break
-            else:
-                c.send(Aproval_Message.APROV_APROVED)
-                break
-        while True:
-            c.send(b'enter password: ')
-            password = c.recv(1024).encode()
-            t, e = user_pw_pass(user_name)
-            if not t:
-                c.send(Aproval_Message.APROV_DISAPROVED)
-                c.send(f"Invalid username -> {e}")
-                break
-            else:
-                c.send(Aproval_Message.APROV_APROVED)
-                break
-
-
-        
-    
-    def user_authentication(self, data) -> bytes:
-        print(data)
-        return Auth_Enums.AUTH_OK
-
-    def client_lobby(self, c):
-        pass
+            print(f"ERROR in server connection initialisation -> {e}")
 
     def run(self):
+        port = 1111
+        user_addr = "localhost"
         while True:
             try:
                 a, p = self.s.accept()
+                data = json.dumps({"addr": 'localhost', "port": port}).encode()
+                a.send(data)
                 print(f"Accepted connection from {a}, at port{p}")
-                #try:
-                #    self.register_user(a)
-                # except:
-                #     pass
-                data = json.loads(a.recv(1024).decode())
-                print(data)
-                auth = self.user_authentication(data)
-                if auth == Auth_Enums.AUTH_OK:
-                    print(f"Authemtocatopn successfull")
-                    print(f"sending authentication: {auth}")
-                    a.send(auth)
-                    c = User(a, p, data)
-                    th = threading.Thread(target=self.client_lobby, args=(c,))
-                    th.daemon = True
-                    th.start()
-                else:
-                    print("sending authentication")
-                    print(f"sending authentication: {auth}")
-                    a.send(auth)
-                    print(f"sent data: {auth}")
-            except KeyboardInterrupt:
-                print("Server closed forcefully")
-                break
+                u = User(a, self.s)
+                client_thread = threading.Thread(target=self.lobby, args=(u,))
+                client_thread.daemon = True
+                client_thread.start()
+                port += 1
             except Exception as e:
-                print(f"ERROR in server client acceptance -> {e}")
+                print(f"ERROR in server connection initialisation -> {e}")
 
-        print("Ending main loop")
-        input()
+    def lobby(self, client: User):
+        self.check_client_on(client)
+        while True:
+            try:
+                action = client.recv()
+                match action:
+                    case Action.ACT_JOIN_ROOM: self.client_join_room(client)
 
-class User:
-    def __init__(self, a, p, data):
-        self.addr = a
-        self.port = p
-        self.user_name = data["user_name"]
-        self.user_id = data["user_id"]
-    def __del__(self):
-        print(f"Deconstructed User with User ID: {self.user_id}.")
+            except Exception as e:
+                print(f"ERROR in client action selection -> {e}")
+
+    def check_client_on(self, client):
+        check_client_thread = threading.Thread(target=self.is_socket_closed, args=(client,))
+        check_client_thread.daemon = True
+        check_client_thread.start()
+
+    def is_socket_closed(self, client):
+        while client.user_is_on:
+            try:
+                # this will try to read bytes without blocking and also without removing them from buffer (peek only)
+                data = client.server_connection.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
+                if len(data) == 0:
+                    self.__del__()
+                    client.user_is_on = False
+                    print("recived empty data, closing")
+                    break
+            except BlockingIOError:
+                continue
+                # return False  # socket is open and reading from it would block
+            except ConnectionResetError:
+                client.__del__()
+                client.user_is_on = False
+                print("recived empty data, closing")
+                break
+                # return True  # socket was closed for some other reason
+            except Exception as e:
+                continue
+                # return False
+
 
 if __name__ == '__main__':
     s = Server('localhost', 42069)
