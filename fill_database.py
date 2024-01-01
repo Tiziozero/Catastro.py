@@ -1,30 +1,41 @@
 import sqlite3
 import random
 import uuid
+import server
 
-def insert_random_data(room_db_path, user_db_path):
-    # Connect to the databases
-    room_db = sqlite3.connect(room_db_path)
-    user_db = sqlite3.connect(user_db_path)
-    room_c = room_db.cursor()
-    user_c = user_db.cursor()
 
-    # Insert random data into the rooms table
-    for _ in range(5):  # Adjust the range for the number of rows you want to insert
-        room_c.execute("INSERT INTO rooms (room_name, room_id, users, active, room_address, room_ip, deacription) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                       (f"Room_{uuid.uuid4()}", str(uuid.uuid4()), random.randint(1, 10), random.randint(0, 1), f"Address_{random.randint(1, 100)}", random.randint(0, 255), "Random Description"))
-    
-    # Insert random data into the users table
-    for _ in range(5):  # Adjust the range for the number of rows you want to insert
-        user_c.execute("INSERT INTO users (user_name, user_id, active, deacription) VALUES (?, ?, ?, ?)",
-                       (f"User_{uuid.uuid4()}", str(uuid.uuid4()), random.randint(0, 1), "Random Description"))
+def add_room(db_name, room_name, capacity=None, room_type=None, is_occupied=False):
+    # Connect to the SQLite database
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
 
-    # Commit changes and close connections
-    room_db.commit()
-    user_db.commit()
-    room_db.close()
-    user_db.close()
+    # Generate a unique UUID for the room_id
+    room_uuid = str(uuid.uuid4())
 
-# Usage
-insert_random_data('databases/rooms/rooms.db', 'databases/users/users.db')
+    # Insert a new room
+    cursor.execute('''
+        INSERT INTO rooms (room_name, room_id, capacity, room_type, is_occupied)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (room_name, room_uuid, capacity, room_type, is_occupied))
 
+    # Commit the transaction and close the connection
+    conn.commit()
+    conn.close()
+
+
+def generate_random_rooms(db_name, number_of_rooms):
+    # List of sample room names and types for random selection
+    sample_room_names = ['Conference Room', 'Meeting Room', 'Office', 'Lounge', 'Auditorium']
+    sample_room_types = ['Conference', 'Meeting', 'Private', 'Public', 'Event']
+
+    for _ in range(number_of_rooms):
+        # Generate random room properties
+        room_name = random.choice(sample_room_names) + ' ' + str(random.randint(1, 100))
+        capacity = random.randint(1, 50)
+        room_type = random.choice(sample_room_types)
+        is_occupied = random.choice([True, False])
+
+        # Add the randomly generated room to the database
+        add_room(db_name, room_name, capacity, room_type, is_occupied)
+
+generate_random_rooms("databases/server/rooms.db", 1)

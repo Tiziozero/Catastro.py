@@ -1,34 +1,23 @@
 import sqlite3
 
-def display_data(db_path, table_name):
-    # Connect to the database
-    db = sqlite3.connect(db_path)
-    cursor = db.cursor()
+def display_rooms(db_name):
+    # Connect to the SQLite database
+    conn = sqlite3.connect(db_name)
+    cursor = conn.cursor()
 
-    # Query to select all data from the table
-    cursor.execute(f"SELECT * FROM {table_name}")
+    # Retrieve all rooms
+    cursor.execute("SELECT * FROM rooms")
+    rooms = cursor.fetchall()
 
-    # Fetch all rows
-    rows = cursor.fetchall()
+    # Close the database connection
+    conn.close()
 
-    # Find the maximum width of data in each column
-    widths = []
-    for col in cursor.description:
-        widths.append(max(len(col[0]), max([len(str(row[1])) for row in rows], default=0)))
+    # Print the rooms in a neat format
+    print(f"{'ID':<5} {'Room Name':<20} {'Room ID':<40} {'Capacity':<10} {'Room Type':<15} {'Occupied':<10}")
+    print("-" * 100)
+    for room in rooms:
+        id, name, room_id, capacity, room_type, is_occupied = room
+        print(f"{id:<5} {name:<20} {room_id:<40} {capacity:<10} {room_type:<15} {is_occupied:<10}")
 
-    # Print the headers
-    header = "|".join([col[0].ljust(width) for col, width in zip(cursor.description, widths)])
-    print(header)
-    print("-" * len(header))
-
-    # Print the rows
-    for row in rows:
-        print("|".join([str(cell).ljust(width) for cell, width in zip(row, widths)]))
-
-    # Close the connection
-    db.close()
-
-# Usage
-display_data('databases/rooms/rooms.db', 'rooms')
-display_data('databases/users/users.db', 'users')
-
+# Example usage
+display_rooms("databases/server/rooms.db")
