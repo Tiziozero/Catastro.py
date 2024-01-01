@@ -3,106 +3,55 @@
 import socket, threading, json, sys, datetime, random, string, uuid
 import sqlite3 as sql
 from comunication_enums import *
-from user import User
 
-MAX_CONNECTIONS = 16
-def random_16_letter_string_generator():
-    return ''.join(random.choice(string.ascii_uppercase + string.ascii_lowercase + string.digits) for _ in range(16))
-
+def send_db(user, db_name):
+    pass
 
 class Server:
     def __init__(self, addr, port):
-        self.addr, self.port = addr, port
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            self.room_db = sql.connect('databases/rooms/rooms.db')
-            self.room_c = self.room_db.cursor()
-            self.room_c.execute('''CREATE TABLE IF NOT EXISTS rooms (
-                   id INTEGER PRIMARY KEY,
-                   room_name TEXT,
-                   room_id TEXT,
-                   users INTEGERS,
-                   active INTEGER,
-                   room_address TEXT,
-                   room_ip INTEGER,
-                   deacription TEXT)''')
-            self.room_db.commit()
-            self.user_db = sql.connect('databases/users/users.db')
-            self.user_c = self.user_db.cursor()
-            self.user_c.execute('''CREATE TABLE IF NOT EXISTS users (
-                   id INTEGER PRIMARY KEY,
-                   user_name TEXT,
-                   user_id TEXT,
-                   active INTEGER,
-                   deacription TEXT)''')
-            self.user_db.commit()
-            self.room_db.close()
-            self.user_db.close()
+            self.addr = addr
+            self.port = port
+            self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server.bind((self.addr, self.port))
+            self.server.listen()
+            conn = sql.connect("databases/server/rooms.db")
+            c = conn.cursor()
+            c.execute('''
+                CREATE TABLE IF NOT EXISTS rooms (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    room_name TEXT NOT NULL,
+                    room_id TEXT NOT NULL UNIQUE,
+                    capacity INTEGER,
+                    room_type TEXT,
+                    is_occupied BOOLEAN
+                )
+            ''')
+            conn.commit()
+            conn.close()
 
         except Exception as e:
-            print(f"ERROR in server database initialisation -> {e}")
-        try:
-            self.s.bind((self.addr, self.port))
-            self.s.listen()
-        except Exception as e:
-            print(f"ERROR in server connection initialisation -> {e}")
+            print(f"ERROR in server setup -> {e}")
 
     def run(self):
-        port = 1111
-        user_addr = "localhost"
         while True:
             try:
-                a, p = self.s.accept()
-                data = json.dumps({"addr": 'localhost', "port": port}).encode()
-                a.send(data)
-                print(f"Accepted connection from {a}, at port{p}")
-                u = User(a, self.s)
-                client_thread = threading.Thread(target=self.lobby, args=(u,))
-                client_thread.daemon = True
-                client_thread.start()
-                port += 1
+                a, p = self.server.accept()
+                a.send(b"Hello client!")
+                user_thread = threading.Thread(targer=self.handle_user, args=(a,))
+                user_thread.daemon = True
+                user_thread.start()
             except Exception as e:
-                print(f"ERROR in server connection initialisation -> {e}")
+                print(f"ERROR in server run -> {e}")
 
-    def lobby(self, client: User):
-        self.check_client_on(client)
+    def handle_user(self, user):
         while True:
             try:
-                action = client.recv()
-                match action:
-                    case Action.ACT_JOIN_ROOM: self.client_join_room(client)
+                send_room(user, db)
+                
 
             except Exception as e:
-                print(f"ERROR in client action selection -> {e}")
-
-    def check_client_on(self, client):
-        check_client_thread = threading.Thread(target=self.is_socket_closed, args=(client,))
-        check_client_thread.daemon = True
-        check_client_thread.start()
-
-    def is_socket_closed(self, client):
-        while client.user_is_on:
-            try:
-                # this will try to read bytes without blocking and also without removing them from buffer (peek only)
-                data = client.server_connection.recv(16, socket.MSG_DONTWAIT | socket.MSG_PEEK)
-                if len(data) == 0:
-                    self.__del__()
-                    client.user_is_on = False
-                    print("recived empty data, closing")
-                    break
-            except BlockingIOError:
-                continue
-                # return False  # socket is open and reading from it would block
-            except ConnectionResetError:
-                client.__del__()
-                client.user_is_on = False
-                print("recived empty data, closing")
-                break
-                # return True  # socket was closed for some other reason
-            except Exception as e:
-                continue
-                # return False
-
+                print(f"ERROR in client handle thread -> {e}")
 
 if __name__ == '__main__':
     s = Server('localhost', 42069)
