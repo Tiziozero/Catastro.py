@@ -1,12 +1,14 @@
 import socket, threading, uuid, struct, logging
 import sqlite3 as sql
 class Room:
-    def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0):
+    def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0, is_open=True):
         self.addr = room_addr
         self.port = room_port
         self.room_name = room_name
         self.room_description = room_description
         self.room_id = room_id
+        self.is_open = is_open
+        self.users = []
 
         if not self.room_id:
             self.room_id = uuid.uuid4()
@@ -17,9 +19,9 @@ class Room:
 
         port = self.server.getsockname()
         print(f"Room under {self.room_id}: {port}")
+        self.port = port[1]
 
         self.server.listen()
-        self.users = []
         try:
             with sql.connect(f"databases/rooms/{self.room_name}_{self.room_id}.db") as db_conn:
                 c = db_conn.cursor()
@@ -34,6 +36,8 @@ class Room:
                 c.close()
         except Exception as e:
             print(f"ERROR in room {self.room_id} database setup -> {e}")
+
+        self.add_room("databases/server/rooms.db", self.room_name, self.room_description, self.addr, self.port, self.room_id, is_open=self.is_open)
         self.on = True
 
     def add_room(self, db_name, room_name, room_description, room_addr, room_port, room_id=None, users=0, is_open=True):
@@ -42,12 +46,12 @@ class Room:
                 c = conn.cursor()
                 if not room_id:
                     room_id = str(uuid.uuid4())
+                room_id = str(room_id)
                 c.execute('''
                     INSERT INTO rooms (room_id, room_name, room_description, room_addr, room_port, users, is_open)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (room_id, room_name, room_description, room_addr,  room_port, users, is_open)
+                ''', (room_id, room_name, room_description, room_addr,  room_port, users, is_open))
                 conn.commit()
-                c.close()
             return True
         except Exception as e:
             print(f"ERROR in creatin room {room_name} -> {e}")
