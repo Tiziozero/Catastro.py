@@ -13,12 +13,31 @@ class Client:
             self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.room_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.server.connect((self.addr, self.port))
+            print(self.server.recv(1023).decode())
         except Exception as e:
             print(f"ERROR in setting up connection with server -> {e}")
 
+    def get_rooms(self):
+        bs = self.server.recv(8)
+        if len(bs) == 0:
+            print("connection closed")
+        (length,) = struct.unpack('>Q', bs)
+        # print(length)
+        # print(f"data len: {bs}")
+        data = b''
+        while len(data) < length:
+            to_read = length - len(data)
+            data += self.server.recv(
+                4096 if to_read > 4096 else to_read)
+        data = json.loads(data.decode())
+        return data
+
     def run(self):
-        return
-        print(self.server.recv(1023).decode())
+        rooms = self.get_rooms()
+        print(f'[ {str("no."): <3}][ {"room name": <30} | {"description": <60} | {"open": >5} ]')
+        for i, room in enumerate(rooms):
+            string = f'[ {str(i): <3}][ {room["name"]: <30} | {room["description"]: <60} | {str(room["is_open"]): >5} ]'
+            print(string)
 
     def in_room(self, room_addr, room_port):
         self.in_room = False
@@ -52,14 +71,14 @@ class Client:
                     raise NoDataException("Division by zero is not allowed.")
                     break
                 (length,) = struct.unpack('>Q', bs)
-                print(f"data len: {bs}")
+                # print(f"data len: {bs}")
                 data = b''
                 while len(data) < length:
                     to_read = length - len(data)
                     data += room_conn.recv(
                         4096 if to_read > 4096 else to_read)
                 data = data.decode()
-                print(f"received {data}")
+                print(data)
             except Exception as e:
                 self.in_room = False
                 print(f"ERROR in receiving data -> {e}")
@@ -84,6 +103,6 @@ class Client:
 
 if __name__ == '__main__':
     c = Client('localhost', 42069)
-    c.in_room('localhost', 2222)
+    # c.in_room('localhost', 44567)
     c.run()
 

@@ -1,5 +1,6 @@
 import socket, threading, uuid, struct, logging
 import sqlite3 as sql
+from user import User
 class Room:
     def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0, is_open=True):
         self.addr = room_addr
@@ -9,18 +10,14 @@ class Room:
         self.room_id = room_id
         self.is_open = is_open
         self.users = []
-
         if not self.room_id:
             self.room_id = uuid.uuid4()
-
         print(f"port = {self.port}")
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((self.addr, self.port))
-
         port = self.server.getsockname()
         print(f"Room under {self.room_id}: {port}")
         self.port = port[1]
-
         self.server.listen()
         try:
             with sql.connect(f"databases/rooms/{self.room_name}_{self.room_id}.db") as db_conn:
@@ -36,8 +33,12 @@ class Room:
                 c.close()
         except Exception as e:
             print(f"ERROR in room {self.room_id} database setup -> {e}")
-
-        self.add_room("databases/server/rooms.db", self.room_name, self.room_description, self.addr, self.port, self.room_id, is_open=self.is_open)
+        self.add_room("databases/server/rooms.db",
+                      self.room_name,
+                      self.room_description,
+                      self.addr, self.port,
+                      self.room_id,
+                      is_open=self.is_open)
         self.on = True
 
     def add_room(self, db_name, room_name, room_description, room_addr, room_port, room_id=None, users=0, is_open=True):
@@ -60,59 +61,61 @@ class Room:
         while self.on:
             try:
                 a, p = self.server.accept()
-                print(f"")
+                u = User(a)
                 a.send(f"welcome in {self.room_name}".encode())
-                self.handle_client(a)
+                self.handle_client(u)
             except Exception as e:
                 print(f"ERROR in room {self.room_id} user acceptance -> {e}")
         
 
-    def handle_client(self, a):
-        self.users.append(a)
-        client_recv_thread = threading.Thread(target=self.client_recv, args=(a,))
+    def handle_client(self, u):
+        self.users.append(u)
+        client_recv_thread = threading.Thread(target=self.client_recv, args=(u,))
         client_recv_thread.daemon = True
         client_recv_thread.start()
 
-    def client_recv(self, a):
+    def client_recv(self, u):
         while self.on:
             try:
-                bs = a.recv(8)
+                bs = u.a.recv(8)
                 if len(bs) == 0:
-                    self.close_client_conection(a)
+                    self.close_client_conection(u)
                     break
                 (length,) = struct.unpack('>Q', bs)
                 print(f"data len: {bs}")
                 data = b''
                 while len(data) < length:
                     to_read = length - len(data)
-                    data += a.recv(
+                    data += u.a.recv(
                         4096 if to_read > 4096 else to_read)
                 data = data.decode()
                 print(f"received {data}")
-                self.send_data_to_all(a, data)
+                self.send_data_to_all(u, data)
             except ValueError as e:
                 print(f"ValueError in room {self.room_id} client receive method -> {e}")
             except Exception as e:
                 print(f"Other error in room {self.room_id} client receive method -> {e}")
+        print(f"Closed receiiving thread with {u.a}")
 
-        print(f"Closed receiiving thread with {a}")
-
-    def send_data_to_all(self, a, data):
+    def send_data_to_all(self, u, data):
         for user in self.users:
-            if user != a:
+            if user != u:
+                data = f"[ {u.name} ]::< {data} >"
                 data = data.encode()
                 length = struct.pack('>Q', len(data))
-                user.sendall(length)
-                user.sendall(data)
+                try:
+                    user.a.sendall(length)
+                    user.a.sendall(data)
+                except Exception as e:
+                    print(f"ERROR in trying to send data to all ({user.a}) -> {e}")
 
-    def close_client_conection(self, a):
-        if a in self.users:
-            self.users.remove(a)
-            a.close()
-            print(f"closed connection with {a}")
+    def close_client_conection(self, u):
+        if u in self.users:
+            self.users.remove(u)
+            u.a.close()
+            print(f"closed connection with {u.a}")
         for user in self.users:
             print(user)
-
 
     def close(self, error=None):
         for c in self.users:
@@ -124,9 +127,9 @@ class Room:
             print("Server closed without any appearing errors.")
 
     def __del__(self):
-        self.close()
+        self.server.close()
 
 if __name__ == "__main__":
     import uuid
-    r = Room("localhost", "Silly people room", "room for silly people")
+    r = Room("localhost", "Silly people room", "room for silly people", room_port=44567)
     r.accept()
