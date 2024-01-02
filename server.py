@@ -38,12 +38,14 @@ class Server:
             c = conn.cursor()
             c.execute('''
                 CREATE TABLE IF NOT EXISTS rooms (
+                    room_id TEXT NOT NULL UNIQUE,
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     room_name TEXT NOT NULL,
-                    room_id TEXT NOT NULL UNIQUE,
-                    capacity INTEGER,
-                    room_type TEXT,
-                    is_occupied BOOLEAN
+                    room_description TEXT,
+                    room_addr TEXT NOT NULL,
+                    room_port TEXT NOT NULL,
+                    users INTEGER,
+                    is_open BOOLEAN
                 )
             ''')
             conn.commit()
@@ -53,23 +55,22 @@ class Server:
         except Exception as e:
             print(f"ERROR in server setup -> {e}")
 
-    def add_room(self, db_name, room_name, capacity=None, room_type=None, is_occupied=False):
-        # Connect to the SQLite database
-        conn = sql.connect(db_name)
-        cursor = conn.cursor()
+    def add_room(self, db_name, room_name, room_description, room_addr, room_port, room_id=None, users=0, is_open=True):
+        try:
+            with sql.connect(db_name) as conn:
+                c = conn.cursor()
+                if not room_id:
+                    room_id = str(uuid.uuid4())
+                c.execute('''
+                    INSERT INTO rooms (room_id, room_name, room_description, room_addr, room_port, users, is_open)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (room_id, room_name, room_description, room_addr,  room_port, users, is_open)
+                conn.commit()
+                c.close()
+            return True
+        except Exception as e:
+            print(f"ERROR in creatin room {room_name} -> {e}")
 
-        # Generate a unique UUID for the room_id
-        room_uuid = str(uuid.uuid4())
-
-        # Insert a new room
-        cursor.execute('''
-            INSERT INTO rooms (room_name, room_id, capacity, room_type, is_occupied)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (room_name, room_uuid, capacity, room_type, is_occupied))
-
-        # Commit the transaction and close the connection
-        conn.commit()
-        conn.close()
     def run(self):
         while True:
             try:

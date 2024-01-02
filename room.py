@@ -1,10 +1,23 @@
-import socket, threading, struct, logging
+import socket, threading, uuid, struct, logging
 import sqlite3 as sql
 class Room:
-    def __init__(self, room_addr, room_port, room_name, room_description, room_id):
-        self.addr, self.port, self.room_name, self.room_description, self.room_id = room_addr, room_port, room_name, room_description, room_id
+    def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0):
+        self.addr = room_addr
+        self.port = room_port
+        self.room_name = room_name
+        self.room_description = room_description
+        self.room_id = room_id
+
+        if not self.room_id:
+            self.room_id = uuid.uuid4()
+
+        print(f"port = {self.port}")
         self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server.bind((self.addr, self.port))
+
+        port = self.server.getsockname()
+        print(f"Room under {self.room_id}: {port}")
+
         self.server.listen()
         self.users = []
         try:
@@ -23,6 +36,22 @@ class Room:
             print(f"ERROR in room {self.room_id} database setup -> {e}")
         self.on = True
 
+    def add_room(self, db_name, room_name, room_description, room_addr, room_port, room_id=None, users=0, is_open=True):
+        try:
+            with sql.connect(db_name) as conn:
+                c = conn.cursor()
+                if not room_id:
+                    room_id = str(uuid.uuid4())
+                c.execute('''
+                    INSERT INTO rooms (room_id, room_name, room_description, room_addr, room_port, users, is_open)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                ''', (room_id, room_name, room_description, room_addr,  room_port, users, is_open)
+                conn.commit()
+                c.close()
+            return True
+        except Exception as e:
+            print(f"ERROR in creatin room {room_name} -> {e}")
+
     def accept(self):
         while self.on:
             try:
@@ -35,6 +64,7 @@ class Room:
         
 
     def handle_client(self, a):
+        self.users.append(a)
         client_recv_thread = threading.Thread(target=self.client_recv, args=(a,))
         client_recv_thread.daemon = True
         client_recv_thread.start()
@@ -45,6 +75,7 @@ class Room:
                 bs = a.recv(8)
                 if len(bs) == 0:
                     self.close_client_conection(a)
+                    break
                 (length,) = struct.unpack('>Q', bs)
                 print(f"data len: {bs}")
                 data = b''
@@ -54,10 +85,29 @@ class Room:
                         4096 if to_read > 4096 else to_read)
                 data = data.decode()
                 print(f"received {data}")
+                self.send_data_to_all(a, data)
             except ValueError as e:
                 print(f"ValueError in room {self.room_id} client receive method -> {e}")
             except Exception as e:
                 print(f"Other error in room {self.room_id} client receive method -> {e}")
+
+        print(f"Closed receiiving thread with {a}")
+
+    def send_data_to_all(self, a, data):
+        for user in self.users:
+            if user != a:
+                data = data.encode()
+                length = struct.pack('>Q', len(data))
+                user.sendall(length)
+                user.sendall(data)
+
+    def close_client_conection(self, a):
+        if a in self.users:
+            self.users.remove(a)
+            a.close()
+            print(f"closed connection with {a}")
+        for user in self.users:
+            print(user)
 
 
     def close(self, error=None):
@@ -74,5 +124,5 @@ class Room:
 
 if __name__ == "__main__":
     import uuid
-    r = Room("localhost", 2222, "Silly people room", "room for silly people", f"{uuid.uuid4()}")
+    r = Room("localhost", "Silly people room", "room for silly people")
     r.accept()

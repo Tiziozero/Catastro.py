@@ -2,6 +2,9 @@
 
 import socket, threading, json, sys, datetime, struct
 from comunication_enums import *
+class NoDataException(Exception):
+    def __init__(self, message):
+        super().__init__(message)
 
 class Client:
     def __init__(self, addr, port):
@@ -43,14 +46,22 @@ class Client:
     def room_recv(self, room_conn):
         while self.in_room:
             try:
-                data_len = int(room_conn.recv(4).decode())
-                print(data_len)
-                data = b""
-                while len(data) < data_len:
-                    data += room_conn.recv(512)
-                print(data.decode())
+                bs = room_conn.recv(8)
+                if len(bs) == 0:
+                    self.close_server_conection(a)
+                    raise NoDataException("Division by zero is not allowed.")
+                    break
+                (length,) = struct.unpack('>Q', bs)
+                print(f"data len: {bs}")
+                data = b''
+                while len(data) < length:
+                    to_read = length - len(data)
+                    data += room_conn.recv(
+                        4096 if to_read > 4096 else to_read)
+                data = data.decode()
+                print(f"received {data}")
             except Exception as e:
-                self.in_room = True
+                self.in_room = False
                 print(f"ERROR in receiving data -> {e}")
 
 
