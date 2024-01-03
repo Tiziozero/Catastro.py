@@ -30,6 +30,8 @@ class Client:
             data += self.server.recv(
                 4096 if to_read > 4096 else to_read)
         data = json.loads(data.decode())
+        for d in data:
+            print(d)
         return data
 
     def run(self):
