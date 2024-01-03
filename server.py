@@ -5,7 +5,9 @@ import sqlite3 as sql
 from comunication_enums import *
 from room import Room
 from user import User
-
+def create_room(user):
+    name = json.loads(user.a.recv(1024).decode())
+    
 def send_db(user, db_path, db_name):
     with sql.connect(db_path) as conn:
         c = conn.cursor()
@@ -16,13 +18,13 @@ def send_db(user, db_path, db_name):
         for row in rooms:
             r = {}
             r["id"] = row[0]
-            r["primary_db_key_uuid"] = row[1]
-            r["name"] = row[2]
-            r["description"] = row[3]
-            r["address"] = row[4]
-            r["port"] = row[5]
-            r["users"] = row[6]
-            r["is_open"] = row[7]
+            r["room_id"] = row[1]
+            r["room_name"] = row[2]
+            r["room_description"] = row[3]
+            r["room_address"] = row[4]
+            r["room_port"] = row[5]
+            r["room_users"] = row[6]
+            r["room_is_open"] = row[7]
             data.append(r)
         send_data = json.dumps(data)
         data = send_data.encode()
@@ -46,14 +48,14 @@ class Server:
                 c = conn.cursor()
                 c.execute('''
                     CREATE TABLE IF NOT EXISTS rooms (
-                        room_id TEXT NOT NULL UNIQUE,
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        room_id TEXT NOT NULL UNIQUE,
                         room_name TEXT NOT NULL,
                         room_description TEXT,
-                        room_addr TEXT NOT NULL,
+                        room_address TEXT NOT NULL,
                         room_port TEXT NOT NULL,
-                        users INTEGER,
-                        is_open BOOLEAN
+                        room_users INTEGER,
+                        room_is_open BOOLEAN
                     )
                 ''')
                 conn.commit()
@@ -70,13 +72,13 @@ class Server:
                 sys.exit()
                 return
             print("made database rooms")
+            self.server_on = True
 
         except Exception as e:
             print(f"ERROR in server setup -> {e}")
 
-
     def run(self):
-        while True:
+        while self.server_on:
             try:
                 a, p = self.server.accept()
                 a.send(b"Hello client!")
@@ -84,15 +86,26 @@ class Server:
                 user_thread = threading.Thread(target=self.handle_user, args=(u,))
                 user_thread.daemon = True
                 user_thread.start()
+            except KeyboardInterrupt:
+                print(f"KI. closing server accept method.")
+                self.server_on = False
+                break
             except Exception as e:
                 print(f"ERROR in server run -> {e}")
 
     def handle_user(self, user):
-        # while True:
+        while self.server_on:
             try:
-                send_db(user, "databases/server/rooms.db", "rooms")
-                
-
+                action = user.a.recv(256)
+                if action == Action.ACT_BLANK:
+                    print("Received blank from user. Disconnecting.")
+                    break
+                print(action)
+                match action:
+                    case Action.ACT_REQUEST_ROOM: send_db(user, "databases/server/rooms.db", "rooms")
+                    case Action.ACT_JOIN_ROOM: join_room(user)
+                    case Action.ACT_CREATE_ROOM: create_room(user)
+                    case _: print(f"Unrecognised action: {action}")
             except Exception as e:
                 print(f"ERROR in client handle thread -> {e}")
 

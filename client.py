@@ -35,11 +35,31 @@ class Client:
         return data
 
     def run(self):
+        try:
+            print("[0] join room")
+            print("[1] join room")
+            print("[2] create room")
+            action = int(input("action: "))
+            match action:
+                case 0: self.request_room()
+                case 1: self.join_room()
+                case 2: self.create_room()
+                case _: raise ValueError(f"{action} is not a valid action")
+        except Exception as e:
+            print(f"ERROR in joining room -> {e}")
+
+    def send_action(self, conn, action):
+        conn.send(action)
+    def join_room(self):
+        self.send_action(self.server, Action.ACT_JOIN_ROOM)
+    def request_room(self):
+        self.send_action(self.server, Action.ACT_REQUEST_ROOM)
         rooms = self.get_rooms()
-        print(f'[ {str("no."): <3}][ {"room name": <30} | {"description": <60} | {"open": >5} ]')
+        print(f'[ {str("no."): <10} ][ {"room name": <30} | {"description": <60} | {"open": >5} ]')
         for i, room in enumerate(rooms):
-            string = f'[ {str(i): <3}][ {room["name"]: <30} | {room["description"]: <60} | {str(room["is_open"]): >5} ]'
+            string = f'[ {str(i): >10} ][ {room["room_name"]: <30} | {room["room_description"]: <60} | {str(room["room_is_open"]): >5} ]'
             print(string)
+            
 
     def in_room(self, room_addr, room_port):
         self.in_room = False
@@ -92,7 +112,6 @@ class Client:
                 data = input("[ message ]: ")
                 data = data.encode()
                 length = struct.pack('>Q', len(data))
-                
                 room_conn.sendall(length)
                 room_conn.sendall(data)
             except Exception as e:

@@ -49,7 +49,7 @@ class Room:
                     room_id = str(uuid.uuid4())
                 room_id = str(room_id)
                 c.execute('''
-                    INSERT INTO rooms (room_id, room_name, room_description, room_addr, room_port, users, is_open)
+                    INSERT INTO rooms (room_id, room_name, room_description, room_address, room_port, room_users, room_is_open)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 ''', (room_id, room_name, room_description, room_addr,  room_port, users, is_open))
                 conn.commit()

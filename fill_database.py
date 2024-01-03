@@ -12,19 +12,17 @@ def add_room(db_name, room_name, room_uuid, room_desctiption, room_addr, room_po
     # Generate a unique UUID for the room_id
     room_uuid = str(uuid.uuid4())
     """
-      48                      CREATE TABLE IF NOT EXISTS rooms (
-    1                         room_id TEXT NOT NULL UNIQUE,
-    2                         id INTEGER PRIMARY KEY AUTOINCREMENT,
-    3                         room_name TEXT NOT NULL,
-    4                         room_description TEXT,
-    5                         room_addr TEXT NOT NULL,
-    6                         room_port TEXT NOT NULL,
-    7                         users INTEGER,
-    8                         is_open BOOLEAN
-    # oInsert a new room
-    """
+        9                     CREATE TABLE IF NOT EXISTS rooms (
+    8                         id TEXT NOT NULL UNIQUE,
+    7                         id INTEGER PRIMARY KEY AUTOINCREMENT,
+    6                         name TEXT NOT NULL,
+    5                         description TEXT,
+    4                         addr TEXT NOT NULL,
+    3                         port TEXT NOT NULL,
+    2                         users INTEGER,
+    1                         is_open BOOLEAN"""
     cursor.execute('''
-        INSERT INTO rooms (room_name, room_id, room_description, room_addr, room_port, users, is_open)
+        INSERT INTO rooms (name, id, description, address, port, users, is_open)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     ''', (room_name, room_uuid, room_desctiption, room_addr, room_port, users, is_open))
 
@@ -49,6 +47,7 @@ def generate_random_rooms(db_name, number_of_rooms):
     sample_room_types = ['Conference', 'Meeting', 'Private', 'Public', 'Event']
 
     for i in range(number_of_rooms):
+        print(f"round {i}")
         # Generate random room properties
         room_name = random.choice(sample_room_names) + ' ' + str(random.randint(1, 100))
         capacity = random.randint(1, 50)
@@ -57,4 +56,5 @@ def generate_random_rooms(db_name, number_of_rooms):
         # Add the randomly generated room to the database
         add_room(db_name, room_name, uuid.uuid4(), generate_random_description(), generate_random_ip(), 26354 + 4*i, capacity, is_open)
 
-generate_random_rooms("databases/server/rooms.db", 8234579)
+for _ in range(2034):
+    generate_random_rooms("databases/server/rooms.db", 8234579)

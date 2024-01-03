@@ -1,8 +1,10 @@
 class Action:
     ACT_LOG_IN = b'LOG_IN'
     ACT_REGISTER_USER = b'REGISTER_USER'
+    ACT_REQUEST_ROOM = b'REQUEST_ROOM'
     ACT_CREATE_ROOM = b'CREATE_ROOM'
     ACT_JOIN_ROOM = b'JOIN_ROOM'
+    ACT_BLANK = b''
 
 
 class Aproval_Messages:
