@@ -36,7 +36,7 @@ class Client:
 
     def run(self):
         try:
-            print("[0] join room")
+            print("[0] request room")
             print("[1] join room")
             print("[2] create room")
             action = int(input("action: "))
@@ -52,12 +52,43 @@ class Client:
         conn.send(action)
     def join_room(self):
         self.send_action(self.server, Action.ACT_JOIN_ROOM)
+        try:
+            while True:
+                try:
+                    room_name = input("Room id: ")
+                    self.server.send(room_name.encode())
+                except Exception as e:
+                    print(f"ERROR -> {e}")
+                    continue
+
+                if self.server.recv(1025) != Room_Enum.ROOM_FOUND:
+                    print(f"room {room_name} not found.")
+                    return Room_Enum.ROOM_FOUND
+
+                if self.server.recv(512) == Password.PASS_NEEDED:
+                    while True:
+                        password = input("Password: ")
+                        self.server.send(password.encode())
+
+                        if self.server.recv(512) != Password.PASS_GUESSED:
+                            self.server.send(Room.WRONG_PASSWORD)
+                            print("Password is incorrect.")
+                            continue
+                        break
+                    self.server.send(Room_Enum.REQUEST_ROOM)
+                    data = json.loads(self.server.recv(4096))
+                    print(f"Joining room {data}")
+                    self.in_room(data["address"], data["port"])
+
+        except Exception as e:
+            print(f"ERROR in client join room request -> {e}")
+
     def request_room(self):
         self.send_action(self.server, Action.ACT_REQUEST_ROOM)
         rooms = self.get_rooms()
-        print(f'[ {str("no."): <10} ][ {"room name": <30} | {"description": <60} | {"open": >5} ]')
+        print(f'[ {str("no."): <10} ][ {"room name temp pw": <30} | {"id": <60} | {"open": >5} ]')
         for i, room in enumerate(rooms):
-            string = f'[ {str(i): >10} ][ {room["room_name"]: <30} | {room["room_description"]: <60} | {str(room["room_is_open"]): >5} ]'
+            string = f'[ {str(i): >10} ][ {room["room_password"]: <30} | {room["room_id"]: <59} | {str(room["room_is_open"]): >5} ]'
             print(string)
             
 

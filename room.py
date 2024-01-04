@@ -2,13 +2,14 @@ import socket, threading, uuid, struct, logging
 import sqlite3 as sql
 from user import User
 class Room:
-    def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0, is_open=True):
+    def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0, is_open=True, r_password=''):
         self.addr = room_addr
         self.port = room_port
         self.room_name = room_name
         self.room_description = room_description
         self.room_id = room_id
         self.is_open = is_open
+        self.r_password = r_password
         self.users = []
         if not self.room_id:
             self.room_id = uuid.uuid4()
@@ -38,10 +39,15 @@ class Room:
                       self.room_description,
                       self.addr, self.port,
                       self.room_id,
-                      is_open=self.is_open)
+                      is_open=self.is_open,
+                      r_password=self.r_password)
         self.on = True
+        th = threading.Thread(target=self.accept)
+        th.daemon = True
+        th.start()
 
-    def add_room(self, db_name, room_name, room_description, room_addr, room_port, room_id=None, users=0, is_open=True):
+    def add_room(self, db_name, room_name, room_description, room_addr, room_port, room_id=None, users=0, is_open=True, r_password=''):
+        pw = r_password
         try:
             with sql.connect(db_name) as conn:
                 c = conn.cursor()
@@ -49,9 +55,9 @@ class Room:
                     room_id = str(uuid.uuid4())
                 room_id = str(room_id)
                 c.execute('''
-                    INSERT INTO rooms (room_id, room_name, room_description, room_address, room_port, room_users, room_is_open)
-                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                ''', (room_id, room_name, room_description, room_addr,  room_port, users, is_open))
+                    INSERT INTO rooms (room_id, room_name, room_description, room_address, room_port, room_users, room_is_open, room_password)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (room_id, room_name, room_description, room_addr,  room_port, users, is_open, pw))
                 conn.commit()
             return True
         except Exception as e:

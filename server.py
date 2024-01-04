@@ -5,8 +5,56 @@ import sqlite3 as sql
 from comunication_enums import *
 from room import Room
 from user import User
+
+def get_room(room_id):
+    with sql.connect("databases/server/rooms.db") as conn:
+        c = conn.cursor()
+        try:
+            c.execute("SELECT * FROM rooms WHERE room_id = ?", (room_id,))
+            data = c.fetchall()
+            print(data)
+            for d in data[0]:
+                print(d)
+            return data[0]
+        except Exception as e:
+            print("ERROR in searching for database for room_id {room_id} -> {e}")
+            return None
+
+
 def create_room(user):
-    name = json.loads(user.a.recv(1024).decode())
+    data = json.loads(user.a.recv(1024).decode())
+
+def join_room(user):
+    while True:
+        room_id = user.a.recv(1024).decode()
+        print(room_id)
+        rooms = get_room(room_id)
+        if rooms == None:
+            user.a.send(Room_Enum.ROOM_NOT_FOUND)
+            continue
+        else:
+            user.a.send(Room_Enum.ROOM_FOUND)
+            print(rooms[7])
+            if rooms[7] == 1:
+                print("room is open")
+            elif rooms[7] == 0:
+                print("room is closed")
+                user.a.send(Password.PASS_NEEDED)
+                while True:
+                    print(rooms[8])
+                    password = user.a.recv(2048).decode()
+                    print(password)
+                    if password != rooms[8]:
+                        print("Wrong password")
+                        user.a.sendall(Password.PASS_NOT_GUESSED)
+                    elif password == rooms[8]:
+                        print("Password guessed")
+                        user.a.sendall(Password.PASS_GUESSED)
+                        break
+                if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
+                    json_data = {"address": rooms[4], "port": int(rooms[5])}
+                    user.a.send(json.dumps(json_data).encode())
+                    return True
     
 def send_db(user, db_path, db_name):
     with sql.connect(db_path) as conn:
@@ -25,6 +73,7 @@ def send_db(user, db_path, db_name):
             r["room_port"] = row[5]
             r["room_users"] = row[6]
             r["room_is_open"] = row[7]
+            r["room_password"] = row[8]
             data.append(r)
         send_data = json.dumps(data)
         data = send_data.encode()
@@ -55,7 +104,8 @@ class Server:
                         room_address TEXT NOT NULL,
                         room_port TEXT NOT NULL,
                         room_users INTEGER,
-                        room_is_open BOOLEAN
+                        room_is_open BOOLEAN,
+                        room_password TEXT
                     )
                 ''')
                 conn.commit()
@@ -66,7 +116,7 @@ class Server:
                 return
             try:
                 if len(self.rooms) <= 0:
-                    self.rooms.append(Room('localhost', "room null", "room null"))
+                    self.rooms.append(Room('localhost', "room null", "room null", is_open=False, r_password='pasta'))
             except Exception as e:
                 print(f"ERROR in creating room null -> {e}")
                 sys.exit()
