@@ -26,5 +26,9 @@ class Password:
 
 class Room_Enum:
     ROOM_FOUND = b'ROOM_FOUND'
+    ROOM_NOT_FOUND = b'ROOM_NOT_FOUND'
     REQUEST_ROOM = b'REQUEST_ROOM'
     WRONG_PASSWORD = b'WRONG_PASSWORD'
+
+class Room_Action:
+    ROOM_ACT_QUIT = b'ROOM_ACT_QUIT'

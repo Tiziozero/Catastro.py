@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+# Add create new room and add restoring rooms from databases in databases/rooms
+# Fix up code cuz it's a mess
+
 import socket, threading, json, sys, datetime, struct
 from comunication_enums import *
 class NoDataException(Exception):
@@ -9,44 +12,56 @@ class NoDataException(Exception):
 class Client:
     def __init__(self, addr, port):
         try:
-            self.addr, self.port = addr, port
             self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.addr, self.port = addr, port
             self.room_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.server.connect((self.addr, self.port))
             print(self.server.recv(1023).decode())
         except Exception as e:
             print(f"ERROR in setting up connection with server -> {e}")
 
     def get_rooms(self):
+        print("get start")
         bs = self.server.recv(8)
         if len(bs) == 0:
             print("connection closed")
         (length,) = struct.unpack('>Q', bs)
-        # print(length)
-        # print(f"data len: {bs}")
+        print("get len", length)
+        print(length)
+        print(f"data len: {bs}")
         data = b''
         while len(data) < length:
             to_read = length - len(data)
             data += self.server.recv(
                 4096 if to_read > 4096 else to_read)
         data = json.loads(data.decode())
-        for d in data:
-            print(d)
+        print("get end")
         return data
 
     def run(self):
-        try:
-            print("[0] request room")
-            print("[1] join room")
-            print("[2] create room")
-            action = int(input("action: "))
-            match action:
-                case 0: self.request_room()
-                case 1: self.join_room()
-                case 2: self.create_room()
-                case _: raise ValueError(f"{action} is not a valid action")
-        except Exception as e:
-            print(f"ERROR in joining room -> {e}")
+        while True:
+            try:
+                try:
+                    print(self.addr)
+                    print(self.port)
+                    self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    self.server.connect((self.addr, self.port))
+                    print(self.server.recv(1024).decode())
+                except Exception as e:
+                    print(f"ERROR connecting to server -> {e}")
+                print("[0] request room")
+                print("[1] join room")
+                print("[2] create room")
+                print("[9] to quit")
+
+                action = int(input("action: "))
+                match action:
+                    case 0: self.request_room()
+                    case 1: self.join_room()
+                    case 2: self.create_room()
+                    case 9: return
+                    case _: raise ValueError(f"{action} is not a valid action")
+            except Exception as e:
+                print(f"ERROR in client lobby -> {e}")
 
     def send_action(self, conn, action):
         conn.send(action)
@@ -79,6 +94,7 @@ class Client:
                     data = json.loads(self.server.recv(4096))
                     print(f"Joining room {data}")
                     self.in_room(data["address"], data["port"])
+                    return
 
         except Exception as e:
             print(f"ERROR in client join room request -> {e}")
@@ -110,6 +126,7 @@ class Client:
 
             r_t.join()
             s_t.join()
+            self.room_server.close()
             print("Both receiving thread and sending thread ended")
 
         except Exception as e:
@@ -141,6 +158,11 @@ class Client:
         while self.in_room:
             try:
                 data = input("[ message ]: ")
+                if data == "QUIT!":
+                    l = struct.pack('>Q', len(Room_Action.ROOM_ACT_QUIT))
+                    room_conn.sendall(l)
+                    room_conn.sendall(Room_Action.ROOM_ACT_QUIT)
+                    self.in_room = False
                 data = data.encode()
                 length = struct.pack('>Q', len(data))
                 room_conn.sendall(length)
@@ -151,6 +173,7 @@ class Client:
     
     def __del__(self):
         self.server.close()
+        self.room_server.close()
         print("Closed connection to server")
 
 if __name__ == '__main__':

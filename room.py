@@ -1,8 +1,9 @@
-import socket, threading, uuid, struct, logging
+import socket, threading, uuid, struct, logging, datetime
 import sqlite3 as sql
 from user import User
+from comunication_enums import *
 class Room:
-    def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0, is_open=True, r_password=''):
+    def __init__(self, room_addr, room_name, room_description, room_id=None, room_port=0, is_open=True, r_password='', MAKE_NEW=False):
         self.addr = room_addr
         self.port = room_port
         self.room_name = room_name
@@ -20,27 +21,30 @@ class Room:
         print(f"Room under {self.room_id}: {port}")
         self.port = port[1]
         self.server.listen()
+        self.chat_db_name = f"databases/rooms/{self.room_name}_{self.room_id}.db"
         try:
-            with sql.connect(f"databases/rooms/{self.room_name}_{self.room_id}.db") as db_conn:
+            with sql.connect(self.chat_db_name) as db_conn:
                 c = db_conn.cursor()
                 c.execute("""
                     CREATE TABLE IF NOT EXISTS chat (
                         id INTEGER PRIMARY KEY,
                         time TEXT,
                         user_addr TEXT,
+                        name TEXT,
                         message TEXT
                     )
                 """)
                 c.close()
         except Exception as e:
             print(f"ERROR in room {self.room_id} database setup -> {e}")
-        self.add_room("databases/server/rooms.db",
-                      self.room_name,
-                      self.room_description,
-                      self.addr, self.port,
-                      self.room_id,
-                      is_open=self.is_open,
-                      r_password=self.r_password)
+        if MAKE_NEW:
+            self.add_room("databases/server/rooms.db",
+                          self.room_name,
+                          self.room_description,
+                          self.addr, self.port,
+                          self.room_id,
+                          is_open=self.is_open,
+                          r_password=self.r_password)
         self.on = True
         th = threading.Thread(target=self.accept)
         th.daemon = True
@@ -80,6 +84,16 @@ class Room:
         client_recv_thread.daemon = True
         client_recv_thread.start()
 
+    def add_message_to_chat_db(self, user_addr, name, message):
+        with sql.connect(self.chat_db_name) as db_conn:
+            c = db_conn.cursor()
+            sqlval = """
+            INSERT INTO chat (time, user_addr, name, message)
+            VALUES (?, ?, ?, ?)
+            """
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            c.execute(sqlval, (current_time, user_addr, name, message))
+            db_conn.commit()
     def client_recv(self, u):
         while self.on:
             try:
@@ -94,7 +108,12 @@ class Room:
                     to_read = length - len(data)
                     data += u.a.recv(
                         4096 if to_read > 4096 else to_read)
+                if data == Room_Action.ROOM_ACT_QUIT:
+                    self.close_client_conection(u)
+                    self.send_data_to_all(u, f"user {u.name} disconnected")
+                    return
                 data = data.decode()
+                self.add_message_to_chat_db(u.a.getsockname()[0], u.name, data)
                 print(f"received {data}")
                 self.send_data_to_all(u, data)
             except ValueError as e:
@@ -125,7 +144,7 @@ class Room:
 
     def close(self, error=None):
         for c in self.users:
-            c.close()
+            c.a.close()
         self.server.close()
         if error:
             print(f"Server closed with error -> {error}.")
@@ -133,6 +152,18 @@ class Room:
             print("Server closed without any appearing errors.")
 
     def __del__(self):
+        print(f"Closing database with id {self.room_id}")
+        with sql.connect(db_name) as conn:
+            c = conn.cursor()
+            try:
+                sql = "DELETE FROM rooms WHERE room_id = ?"
+                c.execute(sql, (self.room_id,))
+                conn.commit()
+            except sqlite3.Error as e:
+                print(f"An error occurred: {e}")
+            finally:
+                conn.close()
+
         self.server.close()
 
 if __name__ == "__main__":

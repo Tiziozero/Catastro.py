@@ -24,37 +24,37 @@ def get_room(room_id):
 def create_room(user):
     data = json.loads(user.a.recv(1024).decode())
 
+def get_password(user, rooms):
+    print("room is closed")
+    user.a.send(Password.PASS_NEEDED)
+    while True:
+        print(rooms[8])
+        password = user.a.recv(2048).decode()
+        print(password)
+        if password != rooms[8]:
+            print("Wrong password")
+            user.a.sendall(Password.PASS_NOT_GUESSED)
+        elif password == rooms[8]:
+            print("Password guessed")
+            user.a.sendall(Password.PASS_GUESSED)
+            return True
+
 def join_room(user):
     while True:
         room_id = user.a.recv(1024).decode()
         print(room_id)
         rooms = get_room(room_id)
-        if rooms == None:
-            user.a.send(Room_Enum.ROOM_NOT_FOUND)
-            continue
-        else:
+        if rooms != None:
             user.a.send(Room_Enum.ROOM_FOUND)
             print(rooms[7])
-            if rooms[7] == 1:
-                print("room is open")
-            elif rooms[7] == 0:
-                print("room is closed")
-                user.a.send(Password.PASS_NEEDED)
-                while True:
-                    print(rooms[8])
-                    password = user.a.recv(2048).decode()
-                    print(password)
-                    if password != rooms[8]:
-                        print("Wrong password")
-                        user.a.sendall(Password.PASS_NOT_GUESSED)
-                    elif password == rooms[8]:
-                        print("Password guessed")
-                        user.a.sendall(Password.PASS_GUESSED)
-                        break
-                if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
-                    json_data = {"address": rooms[4], "port": int(rooms[5])}
-                    user.a.send(json.dumps(json_data).encode())
-                    return True
+            if rooms[7] == 0:
+                if get_password(user, rooms):
+                    if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
+                        json_data = {"address": rooms[4], "port": int(rooms[5])}
+                        user.a.send(json.dumps(json_data).encode())
+        else:
+            user.a.send(Room_Enum.ROOM_NOT_FOUND)
+            continue
     
 def send_db(user, db_path, db_name):
     with sql.connect(db_path) as conn:
@@ -105,7 +105,9 @@ class Server:
                         room_port TEXT NOT NULL,
                         room_users INTEGER,
                         room_is_open BOOLEAN,
-                        room_password TEXT
+                        room_password TEXT,
+                        room_db_name TEXT,
+                        room_is_on BOOEAN
                     )
                 ''')
                 conn.commit()
@@ -116,7 +118,7 @@ class Server:
                 return
             try:
                 if len(self.rooms) <= 0:
-                    self.rooms.append(Room('localhost', "room null", "room null", is_open=False, r_password='pasta'))
+                    self.rooms.append(Room('localhost', "room null", "room null", is_open=False, r_password='pasta', MAKE_NEW=True))
             except Exception as e:
                 print(f"ERROR in creating room null -> {e}")
                 sys.exit()
