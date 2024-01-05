@@ -21,6 +21,11 @@ class Room:
         print(f"Room under {self.room_id}: {port}")
         self.port = port[1]
         self.server.listen()
+        if not MAKE_NEW:
+            with sql.connect("databases/server/room.db") as conn:
+                c = conn.cursor()
+                c.execute("UPDATE rooms SET room_port = ? WHERE room_id = self.room_id", self.port)
+                print(f"Updated port: {self.port}")
         self.chat_db_name = f"databases/rooms/{self.room_name}_{self.room_id}.db"
         try:
             with sql.connect(self.chat_db_name) as db_conn:
@@ -156,10 +161,10 @@ class Room:
         with sql.connect(db_name) as conn:
             c = conn.cursor()
             try:
-                sql = "DELETE FROM rooms WHERE room_id = ?"
-                c.execute(sql, (self.room_id,))
+                sqlv = "DELETE FROM rooms WHERE room_id = ?"
+                c.execute(sqlv, (self.room_id,))
                 conn.commit()
-            except sqlite3.Error as e:
+            except sql.Error as e:
                 print(f"An error occurred: {e}")
             finally:
                 conn.close()

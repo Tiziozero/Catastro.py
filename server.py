@@ -100,6 +100,14 @@ def send_db(user, db_path, db_name):
         user.a.sendall(length)
         user.a.sendall(data)
 
+def get_whole_db(path, tname):
+    with sql.connect(path) as db:
+        c = db.cursor()
+        c.execute(f"SELECT * FROM {tname}")
+        data = c.fetchall()
+        for d in data: print(d)
+        return data
+
 class Server:
     def __init__(self, addr, port):
         try:
@@ -147,10 +155,34 @@ class Server:
         except Exception as e:
             print(f"ERROR in server setup -> {e}")
 
+        self.load_rooms("databases/server/rooms.db", "rooms")
+
+    def load_rooms(self, db_path, table_name):
+        data = get_whole_db(db_path, table_name)
+        for d in data:
+            _id = d[0]
+            room_id = d[1]
+            room_name = d[2]
+            room_desc = d[3]
+            room_addr = d[4]
+            room_port = d[5]
+            room_users = d[6]
+            room_is_open = d[7]
+            room_password = d[8]
+            r = Room(room_addr=room_addr,
+                     room_name=room_name,
+                     room_description=room_desc,
+                     room_id=room_id,
+                     is_open=room_is_open,
+                     r_password=room_password,
+                     MAKE_NEW=False)
+
     def run(self):
         while self.server_on:
+            print("Server open for acceptions.")
             try:
                 a, p = self.server.accept()
+                print(f"Accepted connection from {a.getsockname()}")
                 a.send(b"Hello client!")
                 u = User(a)
                 user_thread = threading.Thread(target=self.handle_user, args=(u,))
