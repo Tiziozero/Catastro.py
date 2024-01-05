@@ -79,7 +79,7 @@ class Client:
             while True:
                 try:
                     room_name = input("Room id: ")
-                    self.server.send(room_name.encode())
+                    self.server.send(room_name.encode("utf-8"))
                 except Exception as e:
                     print(f"ERROR -> {e}")
                     continue
@@ -94,7 +94,7 @@ class Client:
                         if len(password) >= 40:
                             print("Password too long")
                             continue
-                        self.server.send(password.encode())
+                        self.server.send(password.encode("utf-8"))
                         pass_guessed = self.server.recv(512)
                         print(pass_guessed)
                         if pass_guessed != Password.PASS_GUESSED:
@@ -171,8 +171,8 @@ class Client:
                 print("    -Numbers")
         else: pass
         clear_screen()
-        self.server.send(Action.ACT_CREATE_ROOM)
-        self.server.send(json.dumps(room_data).encode())
+        self.server.sendall(Action.ACT_CREATE_ROOM)
+        self.server.sendall(json.dumps(room_data).encode("utf-8"))
 
             
 
@@ -238,7 +238,7 @@ class Client:
                     room_conn.sendall(l)
                     room_conn.sendall(Room_Action.ROOM_ACT_QUIT)
                     self.in_room = False
-                data = data.encode()
+                data = data.encode("utf-8")
                 length = struct.pack('>Q', len(data))
                 room_conn.sendall(length)
                 room_conn.sendall(data)
@@ -255,6 +255,6 @@ class Client:
 if __name__ == '__main__':
     for _ in range(120):
         print()
-    c = Client('139.162.200.195', 42069)
+    c = Client('139.162.200.195', 42039)
     c.run()
 

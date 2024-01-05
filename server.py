@@ -63,12 +63,12 @@ def join_room(user):
                 if get_password(user, rooms):
                     if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
                         json_data = {"address": rooms[4], "port": int(rooms[5])}
-                        user.a.send(json.dumps(json_data).encode())
+                        user.a.send(json.dumps(json_data).encode("utf-8"))
             else:
                 user.a.send(Password.PASS_NOT_NEEDED)
                 if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
                     json_data = {"address": rooms[4], "port": int(rooms[5])}
-                    user.a.send(json.dumps(json_data).encode())
+                    user.a.send(json.dumps(json_data).encode("utf-8"))
 
         else:
             user.a.send(Room_Enum.ROOM_NOT_FOUND)
@@ -94,7 +94,7 @@ def send_db(user, db_path, db_name):
             r["room_password"] = row[8]
             data.append(r)
         send_data = json.dumps(data)
-        data = send_data.encode()
+        data = send_data.encode("utf-8")
         print(len(data))
         length = struct.pack('>Q', len(data))
         user.a.sendall(length)
@@ -212,5 +212,5 @@ class Server:
                 print(f"ERROR in user handle thread -> {e}")
 
 if __name__ == '__main__':
-    s = Server('139.162.200.195', 42069)
+    s = Server('139.162.200.195', 42039)
     s.run()
