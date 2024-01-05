@@ -6,6 +6,13 @@ from comunication_enums import *
 from room import Room
 from user import User
 
+def is_valid_password(password):
+    if 8 < len(password) < 30:
+        if re.search("[a-z]", password) and re.search("[A-Z]", password):
+            if re.search("[0-9]", password):
+                return True
+    return False
+
 def get_room(room_id):
     with sql.connect("databases/server/rooms.db") as conn:
         c = conn.cursor()
@@ -17,12 +24,15 @@ def get_room(room_id):
                 print(d)
             return data[0]
         except Exception as e:
-            print("ERROR in searching for database for room_id {room_id} -> {e}")
+            print(f"ERROR in searching for database for room_id {room_id} -> {e}")
             return None
 
 
-def create_room(user):
+def create_room(server, user):
     data = json.loads(user.a.recv(1024).decode())
+    r = Room("localhost",data["name"],data["description"], is_open=data["is_open"], r_password=data["password"], MAKE_NEW=True)
+    server.rooms.append(r)
+
 
 def get_password(user, rooms):
     print("room is closed")
@@ -34,6 +44,7 @@ def get_password(user, rooms):
         if password != rooms[8]:
             print("Wrong password")
             user.a.sendall(Password.PASS_NOT_GUESSED)
+            print(user.a.recv(2048))
         elif password == rooms[8]:
             print("Password guessed")
             user.a.sendall(Password.PASS_GUESSED)
@@ -43,6 +54,7 @@ def join_room(user):
     while True:
         room_id = user.a.recv(1024).decode()
         print(room_id)
+        print("calling get room")
         rooms = get_room(room_id)
         if rooms != None:
             user.a.send(Room_Enum.ROOM_FOUND)
@@ -52,6 +64,12 @@ def join_room(user):
                     if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
                         json_data = {"address": rooms[4], "port": int(rooms[5])}
                         user.a.send(json.dumps(json_data).encode())
+            else:
+                user.a.send(Password.PASS_NOT_NEEDED)
+                if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
+                    json_data = {"address": rooms[4], "port": int(rooms[5])}
+                    user.a.send(json.dumps(json_data).encode())
+
         else:
             user.a.send(Room_Enum.ROOM_NOT_FOUND)
             continue
@@ -156,10 +174,10 @@ class Server:
                 match action:
                     case Action.ACT_REQUEST_ROOM: send_db(user, "databases/server/rooms.db", "rooms")
                     case Action.ACT_JOIN_ROOM: join_room(user)
-                    case Action.ACT_CREATE_ROOM: create_room(user)
+                    case Action.ACT_CREATE_ROOM: create_room(self, user)
                     case _: print(f"Unrecognised action: {action}")
             except Exception as e:
-                print(f"ERROR in client handle thread -> {e}")
+                print(f"ERROR in user handle thread -> {e}")
 
 if __name__ == '__main__':
     s = Server('localhost', 42069)
