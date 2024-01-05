@@ -255,6 +255,6 @@ class Client:
 if __name__ == '__main__':
     for _ in range(120):
         print()
-    c = Client('localhost', 42069)
+    c = Client('139.162.200.195', 42069)
     c.run()
 

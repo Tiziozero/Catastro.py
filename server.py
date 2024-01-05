@@ -30,7 +30,7 @@ def get_room(room_id):
 
 def create_room(server, user):
     data = json.loads(user.a.recv(1024).decode())
-    r = Room("localhost",data["name"],data["description"], is_open=data["is_open"], r_password=data["password"], MAKE_NEW=True)
+    r = Room('139.162.200.195',data["name"],data["description"], is_open=data["is_open"], r_password=data["password"], MAKE_NEW=True)
     server.rooms.append(r)
 
 
@@ -144,7 +144,7 @@ class Server:
                 return
             try:
                 if len(self.rooms) <= 0:
-                    self.rooms.append(Room('localhost', "room null", "room null", is_open=False, r_password='pasta', MAKE_NEW=True))
+                    self.rooms.append(Room('139.162.200.195', "room null", "room null", is_open=False, r_password='pasta', MAKE_NEW=True))
             except Exception as e:
                 print(f"ERROR in creating room null -> {e}")
                 sys.exit()
@@ -212,5 +212,5 @@ class Server:
                 print(f"ERROR in user handle thread -> {e}")
 
 if __name__ == '__main__':
-    s = Server('localhost', 42069)
+    s = Server('139.162.200.195', 42069)
     s.run()
