@@ -1,5 +1,5 @@
 __pycache__/
-databases/
-rooms_output.txt
-user_output.txt
+*.txt
+
+!ascii_art.txt
 
