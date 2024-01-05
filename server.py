@@ -29,7 +29,7 @@ def get_room(room_id):
 
 
 def create_room(server, user):
-    data = json.loads(user.a.recv(1024).decode())
+    data = json.loads(user.a.recv(1024).decode('ascii', errors='replace'))
     r = Room('139.162.200.195',data["name"],data["description"], is_open=data["is_open"], r_password=data["password"], MAKE_NEW=True)
     server.rooms.append(r)
 
@@ -39,7 +39,7 @@ def get_password(user, rooms):
     user.a.send(Password.PASS_NEEDED)
     while True:
         print(rooms[8])
-        password = user.a.recv(2048).decode()
+        password = user.a.recv(2048).decode('ascii', errors='replace')
         print(password)
         if password != rooms[8]:
             print("Wrong password")
@@ -52,7 +52,7 @@ def get_password(user, rooms):
 
 def join_room(user):
     while True:
-        room_id = user.a.recv(1024).decode()
+        room_id = user.a.recv(1024).decode('ascii', errors='replace')
         print(room_id)
         print("calling get room")
         rooms = get_room(room_id)
@@ -63,12 +63,12 @@ def join_room(user):
                 if get_password(user, rooms):
                     if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
                         json_data = {"address": rooms[4], "port": int(rooms[5])}
-                        user.a.send(json.dumps(json_data).encode("utf-8"))
+                        user.a.send(json.dumps(json_data).encode('ascii'))
             else:
                 user.a.send(Password.PASS_NOT_NEEDED)
                 if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
                     json_data = {"address": rooms[4], "port": int(rooms[5])}
-                    user.a.send(json.dumps(json_data).encode("utf-8"))
+                    user.a.send(json.dumps(json_data).encode('ascii'))
 
         else:
             user.a.send(Room_Enum.ROOM_NOT_FOUND)
@@ -94,7 +94,7 @@ def send_db(user, db_path, db_name):
             r["room_password"] = row[8]
             data.append(r)
         send_data = json.dumps(data)
-        data = send_data.encode("utf-8")
+        data = send_data.encode('ascii')
         print(len(data))
         length = struct.pack('>Q', len(data))
         user.a.sendall(length)

@@ -28,7 +28,7 @@ class Client:
             self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.addr, self.port = addr, port
             self.room_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            print(self.server.recv(1023).decode())
+            print(self.server.recv(1023).decode('ascii', errors='replace'))
         except Exception as e:
             print(f"ERROR in setting up connection with server -> {e}")
 
@@ -42,7 +42,7 @@ class Client:
             to_read = length - len(data)
             data += self.server.recv(
                 4096 if to_read > 4096 else to_read)
-        data = json.loads(data.decode())
+        data = json.loads(data.decode('ascii', errors='replace'))
         return data
 
     def run(self):
@@ -53,7 +53,7 @@ class Client:
                     print(self.port)
                     self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                     self.server.connect((self.addr, self.port))
-                    print(self.server.recv(1024).decode())
+                    print(self.server.recv(1024).decode('ascii', errors='replace'))
                 except Exception as e:
                     print(f"ERROR connecting to server -> {e}")
                 print("[0] request room")
@@ -79,7 +79,7 @@ class Client:
             while True:
                 try:
                     room_name = input("Room id: ")
-                    self.server.send(room_name.encode("utf-8"))
+                    self.server.send(room_name.encode('ascii'))
                 except Exception as e:
                     print(f"ERROR -> {e}")
                     continue
@@ -94,7 +94,7 @@ class Client:
                         if len(password) >= 40:
                             print("Password too long")
                             continue
-                        self.server.send(password.encode("utf-8"))
+                        self.server.send(password.encode('ascii'))
                         pass_guessed = self.server.recv(512)
                         print(pass_guessed)
                         if pass_guessed != Password.PASS_GUESSED:
@@ -172,7 +172,7 @@ class Client:
         else: pass
         clear_screen()
         self.server.sendall(Action.ACT_CREATE_ROOM)
-        self.server.sendall(json.dumps(room_data).encode("utf-8"))
+        self.server.sendall(json.dumps(room_data).encode('ascii'))
 
             
 
@@ -188,7 +188,7 @@ class Client:
                 for r in data:
                     print(r, end="")
 
-            print(f" ---[[ {self.room_server.recv(1024).decode()} ]]---")
+            print(f" ---[[ {self.room_server.recv(1024).decode('ascii', errors='replace')} ]]---")
             self.in_room = True
 
             r_t = threading.Thread(target=self.room_recv, args=(self.room_server,))
@@ -222,7 +222,7 @@ class Client:
                     to_read = length - len(data)
                     data += room_conn.recv(
                         4096 if to_read > 4096 else to_read)
-                data = data.decode()
+                data = data.decode('ascii', errors='replace')
                 print(data)
             except Exception as e:
                 self.in_room = False
@@ -238,7 +238,7 @@ class Client:
                     room_conn.sendall(l)
                     room_conn.sendall(Room_Action.ROOM_ACT_QUIT)
                     self.in_room = False
-                data = data.encode("utf-8")
+                data = data.encode('ascii')
                 length = struct.pack('>Q', len(data))
                 room_conn.sendall(length)
                 room_conn.sendall(data)
