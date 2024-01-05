@@ -22,10 +22,14 @@ class Room:
         self.port = port[1]
         self.server.listen()
         if not MAKE_NEW:
-            with sql.connect("databases/server/room.db") as conn:
+            with sql.connect("databases/server/rooms.db") as conn:
                 c = conn.cursor()
-                c.execute("UPDATE rooms SET room_port = ? WHERE room_id = self.room_id", self.port)
-                print(f"Updated port: {self.port}")
+                try:
+                    c.execute("UPDATE rooms SET room_port = ? WHERE room_id = ?", (self.port, self.room_id))
+                    conn.commit()  # Ensure changes are committed to the database
+                    print(f"Updated port: {self.port}")
+                except sql.Error as e:
+                    print(f"An error occurred during the update: {e}")
         self.chat_db_name = f"databases/rooms/{self.room_name}_{self.room_id}.db"
         try:
             with sql.connect(self.chat_db_name) as db_conn:
@@ -158,7 +162,7 @@ class Room:
 
     def __del__(self):
         print(f"Closing database with id {self.room_id}")
-        with sql.connect(db_name) as conn:
+        """with sql.connect("databases/server/rooms.db") as conn:
             c = conn.cursor()
             try:
                 sqlv = "DELETE FROM rooms WHERE room_id = ?"
@@ -168,6 +172,7 @@ class Room:
                 print(f"An error occurred: {e}")
             finally:
                 conn.close()
+        """
 
         self.server.close()
 

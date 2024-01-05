@@ -3,7 +3,7 @@
 # Add create new room and add restoring rooms from databases in databases/rooms
 # Fix up code cuz it's a mess
 
-import socket, threading, json, sys, datetime, struct, re
+import socket, threading, json, sys, datetime, struct, re, logging
 from comunication_enums import *
 
 def clear_screen():
@@ -19,6 +19,8 @@ def is_valid_password(password):
 class NoDataException(Exception):
     def __init__(self, message):
         super().__init__(message)
+        self.timestamp = datetime.now()
+        logging.error(f"{detetime.now()}: NoDataError: No data in file decypher.")
 
 class Client:
     def __init__(self, addr, port):
