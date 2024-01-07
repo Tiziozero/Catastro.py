@@ -3,7 +3,7 @@
 # Add create new room and add restoring rooms from databases in databases/rooms
 # Fix up code cuz it's a mess
 
-import socket, threading, json, sys, datetime, struct, re, logging, pyfiglet
+import socket, threading, json, sys, datetime, struct, re, logging, pyfiglet, ast
 from comunication_enums import *
 
 def clear_screen():
@@ -55,6 +55,7 @@ class Client:
                     self.server.connect((self.addr, self.port))
                     print(self.server.recv(1024).decode('ascii', errors='replace'))
                 except Exception as e:
+                    clear_screen()
                     print(f"ERROR connecting to server -> {e}")
                 print("[0] request room")
                 print("[1] join room")
@@ -69,6 +70,7 @@ class Client:
                     case 9: return
                     case _: raise ValueError(f"{action} is not a valid action")
             except Exception as e:
+                clear_screen()
                 print(f"ERROR in client lobby -> {e}")
 
     def send_action(self, conn, action):
@@ -104,9 +106,15 @@ class Client:
                             continue
                         break
                 self.server.send(Room_Enum.REQUEST_ROOM)
-                data = json.loads(self.server.recv(4096))
-                print(f"Joining room {data}")
-                self.in_room(data["address"], data["port"])
+                bs = self.server.recv(8)
+                (length, ) = struct.unpack(">Q", bs)
+                data = b""
+                while len(data) < length:
+                    to_read = length - len(data)
+                    data += self.server.recv(
+                        4096 if to_read > 4096 else to_read)
+                data = json.loads(data.decode('ascii', errors='replace'))
+                self.in_room(data["address"], data["port"], data)
                 return
 
         except Exception as e:
@@ -127,11 +135,17 @@ class Client:
             print(string2)
             print(f'├{"":─<12}┼{"":─<32}┼{"":─<62}┼{"":─<8}┤')
         print(f'└{"":─<12}┴{"":─<32}┴{"":─<62}┴{"":─<8}┘')
-        input("ENTER to continue...")
+        input("Press ENTER to continue...")
+        clear_screen()
 
     def create_room(self):
         clear_screen()
-        room_data = {"name": "", "description": "", "is_open": 1, "password": ""}
+        room_data = {"room_name": "",
+                     "room_description": "",
+                     "room_is_open": 1,
+                     "room_password": "",
+                     "room_welcome_ascii_art": [],
+                     "room_welcome_message": ""}
         while True:
             name = input("Name [ Max 25 characters ]:")
             name = name.strip()
@@ -139,7 +153,7 @@ class Client:
                 clear_screen()
                 print("Invalid name [ Min 3 characters ]")
             else:
-                room_data["name"] = name
+                room_data["room_name"] = name
                 clear_screen()
                 break
         while True:
@@ -149,7 +163,7 @@ class Client:
                 clear_screen()
                 print("Description too long")
             else:
-                room_data["description"] = desc
+                room_data["room_description"] = desc
                 break
         clear_screen()
         while True:
@@ -161,17 +175,17 @@ class Client:
                     print("Value must be 1 or 0")
                     raise ValueError("Value must be 1 or 0")
                 else:
-                    room_data["is_open"] = i_o
+                    room_data["room_is_open"] = i_o
                     break
             except Exception as e:
                 clear_screen()
                 print(f"ERROR in creating room -> {e}")
-        if room_data["is_open"] == 0:
+        if room_data["room_is_open"] == 0:
             clear_screen()
             while True:
                 pw = input("Password [ Min 3 characters ]:")
                 if is_valid_password(pw):
-                    room_data["password"] = pw
+                    room_data["room_password"] = pw
                     break
                 clear_screen()
                 print("Invalid password. Password must contain:")
@@ -179,31 +193,78 @@ class Client:
                 print("    -Numbers")
         else: pass
         clear_screen()
+        while True:
+            welcome_message = input("Welcome message (optional): ")
+            if welcome_message == "":
+                break
+            room_data["room_welcome_message"] = welcome_message
+            break
+        clear_screen()
+        while True:
+            path = input("Welcome ascii art (optional): ")
+            if len(path) == 0:
+                break
+            else:
+                try:
+                    with open(path, "r") as f:
+                        lines = f.readlines()
+                        if 0 < len(lines) <= 120:
+                            room_data["room_welcome_ascii_art"] = lines
+                            break
+                        else:
+                            raise ValueError("File must contain 0 to 120 lines")
+                except Exception as e:
+                    clear_screen()
+                    print(e)
+                    continue
+
+        print(room_data)
+        input()
+        clear_screen()
         self.server.sendall(Action.ACT_CREATE_ROOM)
-        self.server.sendall(json.dumps(room_data).encode('ascii'))
+        data = json.dumps(room_data).encode('ascii')
+        self.server.sendall(struct.pack('>Q', len(data)))
+        self.server.sendall(data)
 
             
 
-    def in_room(self, room_addr, room_port):
+    def in_room(self, room_addr, room_port, room_data):
+        self.room_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         print("enter in room")
-        self.in_room = False
+        self.is_in_room = False
         self.server.close()
+        print(room_data)
         try:
-            self.room_server.connect((room_addr, room_port))
-            for _ in range(120):
-                print()
-            with open("ascii_art.txt", "r") as f:
-                data = f.readlines()
-                for r in data:
+            try:
+                self.room_server.connect((room_addr, room_port))
+                for _ in range(120):
+                    print()
+            except Exception as e:
+                print(f"ERROR in connecting to {room_addr}, {room_port} -> {e}.")
+            
+             # with open("ascii_art.txt", "r") as f:
+            #     data = f.readlines()
+            #     for r in data:
+            #         print(r, end=room_data["welcome art"]"")
+            # print(room_data["welcome art"])
+
+            try:
+                ascii_art = ast.literal_eval(room_data["welcome art"])
+                for r in ascii_art:
                     print(r, end="")
+                print()
+            except Exception as e:
+                print("Invalid ascii art")
+
 
             message = self.room_server.recv(1024).decode('ascii', errors='replace')
+            message = room_data["welcome message"]
 
             # print(f" ---[[ {message} ]]---")
             msg = message
             data = pyfiglet.figlet_format(msg)
             print(data)
-            self.in_room = True
+            self.is_in_room = True
 
             r_t = threading.Thread(target=self.room_recv, args=(self.room_server,))
             s_t = threading.Thread(target=self.room_send, args=(self.room_server,))
@@ -221,15 +282,15 @@ class Client:
         except Exception as e:
             print(f"ERROR in connection with room at {room_addr}, {room_port} -> {e}")
         finally:
-            self.in_room = False
+            self.is_in_room = False
 
     def room_recv(self, room_conn):
-        while self.in_room:
+        while self.is_in_room:
             try:
                 bs = room_conn.recv(8)
                 if len(bs) == 0:
-                    self.close_server_conection(a)
-                    raise NoDataException("Division by zero is not allowed.")
+                    raise NoDataException("no data received from server.")
+                    self.is_in_room = False
                     break
                 (length,) = struct.unpack('>Q', bs)
                 # print(f"data len: {bs}")
@@ -241,25 +302,26 @@ class Client:
                 data = data.decode('ascii', errors='replace')
                 print(data)
             except Exception as e:
-                self.in_room = False
+                self.is_in_room = False
                 print(f"ERROR in receiving data -> {e}")
 
 
     def room_send(self, room_conn):
-        while self.in_room:
+        while self.is_in_room:
             try:
                 data = input("[ message ]: ")
                 if data == "QUIT!":
+                    self.is_in_room = False
                     l = struct.pack('>Q', len(Room_Action.ROOM_ACT_QUIT))
                     room_conn.sendall(l)
                     room_conn.sendall(Room_Action.ROOM_ACT_QUIT)
-                    self.in_room = False
+                    self.is_in_room = False
                 data = data.encode('ascii')
                 length = struct.pack('>Q', len(data))
                 room_conn.sendall(length)
                 room_conn.sendall(data)
             except Exception as e:
-                self.in_room = True
+                self.is_in_room = True
                 print(f"ERROR in sending data -> {e}")
         clear_screen()
     

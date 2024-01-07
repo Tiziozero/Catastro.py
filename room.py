@@ -13,10 +13,10 @@ class Room:
             self.room_port =                0
             self.room_is_open =             room_data["room_is_open"]
             self.room_password =            room_data["room_password"]
-            self.room_welcome_ascii_art =   room_data["room_welcome_ascii_art"]
+            self.room_welcome_ascii_art =   str(room_data["room_welcome_ascii_art"])
             self.room_welcome_message =     room_data["room_welcome_message"]
             self.room_users =               room_data["room_users"]
-            self.room_chat_db_name =        room_data["room_chat_db_name"]
+            self.room_chat_db_name =        ""
             self.room_is_on =               room_data["room_is_on"]
             self.users = []
             self.room_chat_db_name = f"databases/rooms/{self.room_name}_{self.room_id}.db"
@@ -126,6 +126,7 @@ class Room:
             try:
                 a, p = self.server.accept()
                 u = User(a)
+                print(f"Accepted {a}")
                 a.send(f"welcome in {self.room_name}".encode())
                 self.handle_client(u)
             except Exception as e:
@@ -196,6 +197,7 @@ class Room:
         if u in self.users:
             self.users.remove(u)
             u.a.close()
+            u.a = None
             print(f"closed connection with {u.a}")
         for user in self.users:
             print(user)
@@ -223,7 +225,7 @@ class Room:
                 conn.close()
         """
 
-        self.server.close()
+        self.clise()
 
 if __name__ == "__main__":
     import uuid

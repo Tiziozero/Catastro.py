@@ -37,9 +37,30 @@ def get_room(room_id):
             return None
 
 def create_room(server, user):
-    data = json.loads(user.a.recv(1024).decode('ascii', errors='replace'))
-    # to continue
-
+    bs = user.a.recv(8)
+    data = b''
+    (length,) = struct.unpack('>Q', bs)
+    data = b''
+    while len(data) < length:
+        to_read = length - len(data)
+        data += user.a.recv(
+            4096 if to_read > 4096 else to_read)
+    data = json.loads(data.decode("ascii"))
+    r = {}
+    r["room_id"] = str(uuid.uuid4())
+    r["room_name"] = data["room_name"]
+    r["room_description"] = data["room_description"]
+    r["room_address"] = "localhost"
+    r["room_port"] = 0
+    r["room_is_open"] = data["room_is_open"]
+    r["room_password"] = data["room_password"]
+    r["room_welcome_ascii_art"] = str(data["room_welcome_ascii_art"])
+    r["room_welcome_message"] = str(data["room_welcome_message"])
+    r["room_users"] = 0
+    r["room_chat_db_name]"] = ""
+    r["room_is_on"] = 0
+    room = Room(r, True)
+    server.rooms.append(room)
 
 
 def get_room_info(db_path, table_name, column_name, column_value):
@@ -51,20 +72,20 @@ def get_room_info(db_path, table_name, column_name, column_value):
         columns = [description[0] for description in cursor.description]
         result = [dict(zip(columns, row)) for row in rows]
         # print(result)
-        return result[0]
+        return result
 
 def get_password(user, rooms):
     print("room is closed")
     user.a.send(Password.PASS_NEEDED)
     while True:
-        print("password:", rooms[7])
+        print("password:", rooms["room_password"])
         password = user.a.recv(2048).decode('ascii', errors='replace')
         print(password)
-        if password != rooms[7]:
+        if password != rooms["room_password"]:
             print("Wrong password")
             user.a.sendall(Password.PASS_NOT_GUESSED)
             print(user.a.recv(2048))
-        elif password == rooms[7]:
+        elif password == rooms["room_password"]:
             print("Password guessed")
             user.a.sendall(Password.PASS_GUESSED)
             return True
@@ -72,22 +93,34 @@ def get_password(user, rooms):
 def join_room(user):
     while True:
         room_id = user.a.recv(1024).decode('ascii', errors='replace')
-        print(room_id)
-        print("calling get room")
-        rooms = get_room(room_id)
-        if rooms != None:
+        # rooms = get_room(room_id)
+        rooms = get_room_info(RDP, "rooms", "room_id", room_id)
+        if rooms != []:
+            rooms = rooms[0]
             user.a.send(Room_Enum.ROOM_FOUND)
-            print("room is open:", rooms[6])
-            if rooms[6] == 0:
+            print("room is open:", rooms["room_password"])
+            if rooms["room_is_open"] == 0:
                 if get_password(user, rooms):
                     if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
-                        json_data = {"address": rooms[4], "port": int(rooms[5])}
-                        user.a.send(json.dumps(json_data).encode('ascii'))
+                        json_data = json.dumps({
+                                "address": rooms["room_address"],
+                                "port": int(rooms["room_port"]),
+                                "welcome message": rooms["room_welcome_message"],
+                                "welcome art": rooms["room_welcome_ascii_art"]
+                                }).encode("ascii") 
+                        user.a.sendall(struct.pack(">Q", len(json_data)))
+                        user.a.sendall(json_data)
             else:
                 user.a.send(Password.PASS_NOT_NEEDED)
                 if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
-                    json_data = {"address": rooms[4], "port": int(rooms[5])}
-                    user.a.send(json.dumps(json_data).encode('ascii'))
+                    json_data = json.dumps({
+                            "address": rooms["room_address"],
+                            "port": int(rooms["room_port"]),
+                            "welcome message": rooms["room_welcome_message"],
+                            "welcome art": rooms["room_welcome_ascii_art"]
+                            }).encode("ascii") 
+                    user.a.sendall(struct.pack(">Q", len(json_data)))
+                    user.a.sendall(json_data)
 
         else:
             user.a.send(Room_Enum.ROOM_NOT_FOUND)
@@ -204,7 +237,7 @@ class Server:
             data = c.fetchall()
             # print(data)
             for d in data:
-                room_data = get_room_info(db_path, table_name, col_name, d[0])
+                room_data = get_room_info(db_path, table_name, col_name, d[0])[0]
                 print(room_data)
                 r = Room(room_data, False)
                 self.rooms.append(r)
