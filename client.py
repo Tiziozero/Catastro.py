@@ -3,7 +3,7 @@
 # Add create new room and add restoring rooms from databases in databases/rooms
 # Fix up code cuz it's a mess
 
-import socket, threading, json, sys, datetime, struct, re, logging
+import socket, threading, json, sys, datetime, struct, re, logging, pyfiglet
 from comunication_enums import *
 
 def clear_screen():
@@ -73,6 +73,7 @@ class Client:
 
     def send_action(self, conn, action):
         conn.send(action)
+
     def join_room(self):
         self.send_action(self.server, Action.ACT_JOIN_ROOM)
         try:
@@ -115,10 +116,17 @@ class Client:
         clear_screen()
         self.send_action(self.server, Action.ACT_REQUEST_ROOM)
         rooms = self.get_rooms()
-        print(f'[ {str("no."): <10} ][ {"room name temp pw": <30} | {"id": <60} | {"open": >5} ]')
+
+        print(f'┌{"":─<12}┬{"":─<32}┬{"":─<62}┬{"":─<8}┐')
+        print(f'│ {"no.": <10} │ {"room name temp pw": <30} │ {"id": <60} │ {"open": >6} │')
+        print(f'├{"":─<12}┼{"":─<32}┼{"":─<62}┼{"":─<8}┤')
         for i, room in enumerate(rooms):
-            string = f'[ {str(i): >10} ][ {room["room_password"]: <30} | {room["room_id"]: <59} | {str(room["room_is_open"]): >5} ]'
+            string = f'│ {str(i): >10} │ {room["room_password"]: <30} │ {room["room_id"]: <60} │ {str(room["room_is_open"]): >6} │'
+            string2 = f'│ {"": >10} │ {room["room_description"]: <102} │'
             print(string)
+            print(string2)
+            print(f'├{"":─<12}┼{"":─<32}┼{"":─<62}┼{"":─<8}┤')
+        print(f'└{"":─<12}┴{"":─<32}┴{"":─<62}┴{"":─<8}┘')
         input("ENTER to continue...")
 
     def create_room(self):
@@ -177,6 +185,7 @@ class Client:
             
 
     def in_room(self, room_addr, room_port):
+        print("enter in room")
         self.in_room = False
         self.server.close()
         try:
@@ -188,7 +197,12 @@ class Client:
                 for r in data:
                     print(r, end="")
 
-            print(f" ---[[ {self.room_server.recv(1024).decode('ascii', errors='replace')} ]]---")
+            message = self.room_server.recv(1024).decode('ascii', errors='replace')
+
+            # print(f" ---[[ {message} ]]---")
+            msg = message
+            data = pyfiglet.figlet_format(msg)
+            print(data)
             self.in_room = True
 
             r_t = threading.Thread(target=self.room_recv, args=(self.room_server,))
@@ -206,6 +220,8 @@ class Client:
 
         except Exception as e:
             print(f"ERROR in connection with room at {room_addr}, {room_port} -> {e}")
+        finally:
+            self.in_room = False
 
     def room_recv(self, room_conn):
         while self.in_room:
@@ -253,8 +269,17 @@ class Client:
         print("Closed connection to server")
 
 if __name__ == '__main__':
+    addrs = []
+    with open("addr.txt", "r") as f:
+        adrs = f.readlines()
+        for a in adrs:
+            a = a[:-1]
+            print(a)
+            addrs.append(a)
+
+    ind = int(input("[0] localhost, [1] 139.162.200.195: "))
     for _ in range(120):
         print()
-    c = Client('139.162.200.195', 42039)
-    c.run()
 
+    c = Client(addrs[ind], 42039)
+    c.run()

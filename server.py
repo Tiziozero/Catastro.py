@@ -6,6 +6,10 @@ from comunication_enums import *
 from room import Room
 from user import User
 
+ROOMS_DATABASE_PATH = "databases/server/rooms.db"
+RDP = ROOMS_DATABASE_PATH
+
+
 def is_valid_password(password):
     if 8 < len(password) < 30:
         if re.search("[a-z]", password) and re.search("[A-Z]", password):
@@ -13,39 +17,54 @@ def is_valid_password(password):
                 return True
     return False
 
+def get_db_col_names(db_path, table_name):
+    with sql.connect(db_path) as conn:
+        c = conn.cursor()
+        c.execute(f"SELECT * from {table_name} LIMIT 0")
+        col_names = [description[0] for description in c.description]
+        # print(col_names)
+
 def get_room(room_id):
-    with sql.connect("databases/server/rooms.db") as conn:
+    with sql.connect(RDP) as conn:
         c = conn.cursor()
         try:
             c.execute("SELECT * FROM rooms WHERE room_id = ?", (room_id,))
             data = c.fetchall()
-            print(data)
-            for d in data[0]:
-                print(d)
+            # print(data)
             return data[0]
         except Exception as e:
             print(f"ERROR in searching for database for room_id {room_id} -> {e}")
             return None
 
-
 def create_room(server, user):
     data = json.loads(user.a.recv(1024).decode('ascii', errors='replace'))
-    r = Room('139.162.200.195',data["name"],data["description"], is_open=data["is_open"], r_password=data["password"], MAKE_NEW=True)
-    server.rooms.append(r)
+    # to continue
 
+
+
+def get_room_info(db_path, table_name, column_name, column_value):
+    with sql.connect(db_path) as conn:
+        cursor = conn.cursor()
+        query = f"SELECT * FROM {table_name} WHERE {column_name} = ?"
+        cursor.execute(query, (column_value,))
+        rows = cursor.fetchall()
+        columns = [description[0] for description in cursor.description]
+        result = [dict(zip(columns, row)) for row in rows]
+        # print(result)
+        return result[0]
 
 def get_password(user, rooms):
     print("room is closed")
     user.a.send(Password.PASS_NEEDED)
     while True:
-        print(rooms[8])
+        print("password:", rooms[7])
         password = user.a.recv(2048).decode('ascii', errors='replace')
         print(password)
-        if password != rooms[8]:
+        if password != rooms[7]:
             print("Wrong password")
             user.a.sendall(Password.PASS_NOT_GUESSED)
             print(user.a.recv(2048))
-        elif password == rooms[8]:
+        elif password == rooms[7]:
             print("Password guessed")
             user.a.sendall(Password.PASS_GUESSED)
             return True
@@ -58,8 +77,8 @@ def join_room(user):
         rooms = get_room(room_id)
         if rooms != None:
             user.a.send(Room_Enum.ROOM_FOUND)
-            print(rooms[7])
-            if rooms[7] == 0:
+            print("room is open:", rooms[6])
+            if rooms[6] == 0:
                 if get_password(user, rooms):
                     if user.a.recv(1024) == Room_Enum.REQUEST_ROOM:
                         json_data = {"address": rooms[4], "port": int(rooms[5])}
@@ -80,7 +99,7 @@ def send_db(user, db_path, db_name):
         c.execute(f"SELECT * FROM {db_name}")
         rooms = c.fetchall()
         data = []
-        print(len(rooms))
+        # print("length of rows in database to send:", len(rooms))
         for row in rooms:
             r = {}
             r["id"] = row[0]
@@ -89,13 +108,17 @@ def send_db(user, db_path, db_name):
             r["room_description"] = row[3]
             r["room_address"] = row[4]
             r["room_port"] = row[5]
-            r["room_users"] = row[6]
-            r["room_is_open"] = row[7]
-            r["room_password"] = row[8]
+            r["room_is_open"] = row[6]
+            r["room_password"] = row[7]
+            r["room_welcome_ascii_art"] = row[8]
+            r["room_welcome_message"] = row[9]
+            r["room_users"] = row[10]
+            r["room_chat_db_name]"] = row[11]
+            r["room_is_on"] = row[12]
             data.append(r)
         send_data = json.dumps(data)
         data = send_data.encode('ascii')
-        print(len(data))
+        # print("length of data:", len(data))
         length = struct.pack('>Q', len(data))
         user.a.sendall(length)
         user.a.sendall(data)
@@ -105,7 +128,7 @@ def get_whole_db(path, tname):
         c = db.cursor()
         c.execute(f"SELECT * FROM {tname}")
         data = c.fetchall()
-        for d in data: print(d)
+        # for d in data: print(d)
         return data
 
 class Server:
@@ -119,7 +142,7 @@ class Server:
             self.rooms = []
             self.users = []
             try:
-                conn = sql.connect("databases/server/rooms.db")
+                conn = sql.connect(RDP)
                 c = conn.cursor()
                 c.execute('''
                     CREATE TABLE IF NOT EXISTS rooms (
@@ -129,11 +152,13 @@ class Server:
                         room_description TEXT,
                         room_address TEXT NOT NULL,
                         room_port TEXT NOT NULL,
-                        room_users INTEGER,
                         room_is_open BOOLEAN,
                         room_password TEXT,
-                        room_db_name TEXT,
-                        room_is_on BOOEAN
+                        room_welcome_ascii_art TEXT,
+                        room_welcome_message TEXT,
+                        room_users INTEGER,
+                        room_chat_db_name TEXT,
+                        room_is_on BOOLEAN
                     )
                 ''')
                 conn.commit()
@@ -142,40 +167,47 @@ class Server:
                 print(f"ERROR in creating rooms database -> {e}")
                 sys.exit()
                 return
+            print("made database rooms")
             try:
-                if len(self.rooms) <= 0:
-                    self.rooms.append(Room('139.162.200.195', "room null", "room null", is_open=False, r_password='pasta', MAKE_NEW=True))
+                room_data = {
+                        "room_id": str(uuid.uuid4()),
+                        "room_name": "room null",
+                        "room_description": "description for room null",
+                        "room_address": self.addr,
+                        "room_port": 0,
+                        "room_is_open": 0,
+                        "room_password": "pasta",
+                        "room_welcome_ascii_art": "ASCII welcome art",
+                        "room_welcome_message": "Welcome to room null",
+                        "room_users": 0,
+                        "room_chat_db_name": "",
+                        "room_is_on": True
+                    }
+                r = Room(room_data, True)
+                self.rooms.append(r)
             except Exception as e:
                 print(f"ERROR in creating room null -> {e}")
                 sys.exit()
                 return
-            print("made database rooms")
             self.server_on = True
+            get_db_col_names(RDP, "rooms")
 
         except Exception as e:
             print(f"ERROR in server setup -> {e}")
 
-        self.load_rooms("databases/server/rooms.db", "rooms")
+        self.load_rooms(RDP, "rooms")
 
-    def load_rooms(self, db_path, table_name):
-        data = get_whole_db(db_path, table_name)
-        for d in data:
-            _id = d[0]
-            room_id = d[1]
-            room_name = d[2]
-            room_desc = d[3]
-            room_addr = d[4]
-            room_port = d[5]
-            room_users = d[6]
-            room_is_open = d[7]
-            room_password = d[8]
-            r = Room(room_addr=room_addr,
-                     room_name=room_name,
-                     room_description=room_desc,
-                     room_id=room_id,
-                     is_open=room_is_open,
-                     r_password=room_password,
-                     MAKE_NEW=False)
+    def load_rooms(self, db_path, table_name, col_name="room_id"):
+        with sql.connect(db_path) as conn:
+            c = conn.cursor()
+            c.execute(f"SELECT {col_name} FROM {table_name}")
+            data = c.fetchall()
+            # print(data)
+            for d in data:
+                room_data = get_room_info(db_path, table_name, col_name, d[0])
+                print(room_data)
+                r = Room(room_data, False)
+                self.rooms.append(r)
 
     def run(self):
         while self.server_on:
@@ -204,7 +236,7 @@ class Server:
                     break
                 print(action)
                 match action:
-                    case Action.ACT_REQUEST_ROOM: send_db(user, "databases/server/rooms.db", "rooms")
+                    case Action.ACT_REQUEST_ROOM: send_db(user, RDP, "rooms")
                     case Action.ACT_JOIN_ROOM: join_room(user)
                     case Action.ACT_CREATE_ROOM: create_room(self, user)
                     case _: print(f"Unrecognised action: {action}")
@@ -212,5 +244,14 @@ class Server:
                 print(f"ERROR in user handle thread -> {e}")
 
 if __name__ == '__main__':
-    s = Server('139.162.200.195', 42039)
+    addrs = []
+    with open("addr.txt", "r") as f:
+        adrs = f.readlines()
+        for a in adrs:
+            a = a[:-1]
+            print(a)
+            addrs.append(a)
+
+    ind = int(input("[0] localhost, [1] 139.162.200.195: "))
+    s = Server(addrs[ind], 42039)
     s.run()
