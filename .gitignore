@@ -2,5 +2,5 @@ __pycache__/
 *.txt
 
 !ascii_art.txt
-!addrs.txt
+!addr.txt
 
